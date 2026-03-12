@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Double Six Lets — Property Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #181818;
+    --surface2: #222222;
+    --border: #2a2a2a;
+    --accent: #c8f04c;
+    --accent-dim: #a0c038;
+    --text: #f0f0f0;
+    --text-muted: #888;
+    --text-dim: #555;
+    --tenant: #4cf0c8;
+    --supplier: #f0c84c;
+    --utility: #c84cf0;
+    --legal: #f04c4c;
+    --other: #888;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(200,240,76,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,240,76,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(15,15,15,0.95);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-mark {
+    width: 38px; height: 38px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    color: #0f0f0f;
+    font-weight: 700;
+  }
+  .brand-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    letter-spacing: -0.3px;
+  }
+  .brand-sub { font-size: 11px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+
+  .header-actions { display: flex; align-items: center; gap: 12px; }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .status-pill .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .status-pill.connected .dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-pill.connected { color: var(--text); border-color: rgba(200,240,76,0.3); }
+
+  .btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0f0f0f;
+  }
+  .btn-primary:hover { background: var(--accent-dim); transform: translateY(-1px); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+  /* Main layout */
+  .main { display: flex; flex: 1; height: calc(100vh - 73px); }
+
+  /* Sidebar */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+
+  .filter-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.12s;
+    margin-bottom: 2px;
+  }
+  .filter-btn:hover { background: var(--surface2); color: var(--text); }
+  .filter-btn.active { background: rgba(200,240,76,0.1); color: var(--accent); }
+  .filter-btn .filter-left { display: flex; align-items: center; gap: 8px; }
+  .filter-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .filter-count {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: var(--surface2);
+    color: var(--text-muted);
+  }
+  .filter-btn.active .filter-count { background: rgba(200,240,76,0.15); color: var(--accent); }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .stat-value { font-size: 22px; font-family: 'DM Serif Display', serif; color: var(--accent); line-height: 1; }
+  .stat-label { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+
+  /* Email list */
+  .email-list {
+    flex: 1;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    width: 340px;
+    min-width: 340px;
+  }
+
+  .email-list-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .email-list-title { font-size: 13px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.5px; }
+
+  .email-item {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+    position: relative;
+  }
+  .email-item:hover { background: var(--surface); }
+  .email-item.active { background: rgba(200,240,76,0.05); border-left: 2px solid var(--accent); }
+  .email-item.unread .email-sender { font-weight: 600; color: var(--text); }
+
+  .email-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .email-sender { font-size: 13px; color: var(--text-muted); }
+  .email-time { font-size: 11px; color: var(--text-dim); }
+  .email-subject { font-size: 13px; color: var(--text); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .email-preview { font-size: 12px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .category-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  /* Detail panel */
+  .detail-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .detail-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    gap: 12px;
+  }
+  .detail-empty-icon { font-size: 48px; opacity: 0.3; }
+  .detail-empty-text { font-size: 14px; }
+
+  .detail-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .detail-header {
+    padding: 24px 28px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-subject {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    margin-bottom: 10px;
+    line-height: 1.2;
+  }
+  .detail-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .detail-meta-item { font-size: 12px; color: var(--text-muted); }
+  .detail-meta-item strong { color: var(--text); }
+
+  .detail-body {
+    flex: 1;
+    padding: 24px 28px;
+    overflow-y: auto;
+    line-height: 1.7;
+    color: var(--text-muted);
+    font-size: 14px;
+    white-space: pre-wrap;
+  }
+
+  /* AI Panel */
+  .ai-panel {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    max-height: 380px;
+  }
+
+  .ai-panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+  }
+  .ai-tab {
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
+  }
+  .ai-tab:hover { color: var(--text-muted); }
+  .ai-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .ai-panel-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+
+  .ai-output {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+  }
+  .ai-output.loading { color: var(--text-dim); }
+
+  .ai-actions { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+
+  .reply-textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    padding: 12px;
+    resize: none;
+    height: 90px;
+    outline: none;
+    transition: border-color 0.15s;
+    line-height: 1.6;
+  }
+  .reply-textarea:focus { border-color: rgba(200,240,76,0.4); }
+  .reply-textarea::placeholder { color: var(--text-dim); }
+
+  /* Loading spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+
+  /* Fetch bar */
+  .fetch-bar {
+    padding: 12px 20px;
+    background: rgba(200,240,76,0.05);
+    border-bottom: 1px solid rgba(200,240,76,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .fetch-bar-text { font-size: 12px; color: var(--text-muted); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Animations */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .email-item { animation: fadeIn 0.2s ease both; }
+
+  /* Inbox loading state */
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .loading-state .spinner { width: 24px; height: 24px; }
+
+  /* Connect prompt */
+  .connect-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 60px 24px;
+    text-align: center;
+  }
+  .connect-icon { font-size: 40px; }
+  .connect-title { font-family: 'DM Serif Display', serif; font-size: 20px; }
+  .connect-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; max-width: 240px; }
+
+  /* Properties */
+  .property-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .property-card:hover { border-color: rgba(200,240,76,0.3); }
+  .property-card.active { border-color: var(--accent); background: rgba(200,240,76,0.05); }
+  .property-card.purchasing { border-color: rgba(200,240,76,0.2); opacity: 0.7; }
+  .property-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .property-status {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-top: 4px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .status-active { background: rgba(76,240,200,0.15); color: var(--tenant); }
+  .status-purchasing { background: rgba(200,240,76,0.15); color: var(--accent); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 13px;
+    color: var(--text);
+    z-index: 999;
+    animation: fadeIn 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .highlight { color: var(--accent); font-weight: 600; }
+
+  /* Invoice extraction result */
+  .extraction-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .extraction-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .extraction-key { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+  .extraction-val { font-size: 14px; font-weight: 600; color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">66</div>
+      <div>
+        <div class="brand-name">Double Six Lets</div>
+        <div class="brand-sub">Property Agent</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="status-pill" id="gmailStatus">
+        <div class="dot"></div>
+        <span id="gmailStatusText">Not signed in</span>
+      </div>
+      <button class="btn btn-ghost" id="signInBtn" onclick="signIn()">Sign in with Google</button>
+      <button class="btn btn-primary" id="fetchBtn" onclick="fetchEmails()" style="display:none">
+        ↻ Refresh
+      </button>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Filter by Category</div>
+        <button class="filter-btn active" onclick="filterEmails('all')" id="filter-all">
+          <span class="filter-left">
+            <span class="filter-dot" style="background:#888"></span>
+            All Emails
+          </span>
+          <span class="filter-count" id="count-all">0</span>
+        </button>
+        <button class="filter-btn" onclick="filterEmails('Tenant')" id="filter-Tenant">
+          <span class="filter-left">
+            <span class="filter-dot" style="background:var(--tenant)"></span>
+            Tenants
+          </span>
+          <span class="filter-count" id="count-Tenant">0</span>
+        </button>
+        <button class="filter-btn" onclick="filterEmails('Supplier')" id="filter-Supplier">
+          <span class="filter-left">
+            <span class="filter-dot" style="background:var(--supplier)"></span>
+            Suppliers
+          </span>
+          <span class="filter-count" id="count-Supplier">0</span>
+        </button>
+        <button class="filter-btn" onclick="filterEmails('Utility')" id="filter-Utility">
+          <span class="filter-left">
+            <span class="filter-dot" style="background:var(--utility)"></span>
+            Utilities
+          </span>
+          <span class="filter-count" id="count-Utility">0</span>
+        </button>
+        <button class="filter-btn" onclick="filterEmails('Legal')" id="filter-Legal">
+          <span class="filter-left">
+            <span class="filter-dot" style="background:var(--legal)"></span>
+            Legal
+          </span>
+          <span class="filter-count" id="count-Legal">0</span>
+        </button>
+        <button class="filter-btn" onclick="filterEmails('Other')" id="filter-Other">
+          <span class="filter-left">
+            <span class="filter-dot" style="background:var(--other)"></span>
+            Other
+          </span>
+          <span class="filter-count" id="count-Other">0</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Properties</div>
+        <div class="property-card" onclick="filterByProperty('39 Esher')" id="prop-esher">
+          <div class="property-name">39 Esher Road</div>
+          <div style="font-size:11px;color:var(--text-muted)">Liverpool, L6 6DE</div>
+          <span class="property-status status-active">Active</span>
+        </div>
+        <div class="property-card" onclick="filterByProperty('49 Greene')" id="prop-greene">
+          <div class="property-name">49 Greene Way</div>
+          <div style="font-size:11px;color:var(--text-muted)">Double Six Lets</div>
+          <span class="property-status status-active">Active</span>
+        </div>
+        <div class="property-card purchasing" onclick="filterByProperty('105 Ladywell')" id="prop-ladywell">
+          <div class="property-name">105 Ladywell</div>
+          <div style="font-size:11px;color:var(--text-muted)">In conveyancing</div>
+          <span class="property-status status-purchasing">⏳ Purchasing</span>
+        </div>
+        <button class="filter-btn" onclick="filterByProperty(null)" style="margin-top:4px">
+          <span class="filter-left"><span style="font-size:11px">↩</span> Show all</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Overview</div>
+        <div class="stats-grid" id="statsGrid">
+          <div class="stat-card">
+            <div class="stat-value" id="stat-total">—</div>
+            <div class="stat-label">Emails loaded</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-unread">—</div>
+            <div class="stat-label">Unread</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-urgent">—</div>
+            <div class="stat-label">Need action</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-invoices">—</div>
+            <div class="stat-label">Invoices</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email List -->
+    <div class="email-list" id="emailList">
+      <div class="email-list-header">
+        <span class="email-list-title" id="listTitle">INBOX</span>
+        <span id="listSpinner"></span>
+      </div>
+      <div id="emailListBody">
+        <div class="connect-prompt">
+          <div class="connect-icon">📬</div>
+          <div class="connect-title">Ready to connect</div>
+          <div class="connect-desc">Click "Fetch Inbox" to load your Gmail emails and let the agent get to work.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail Panel -->
+    <div class="detail-panel" id="detailPanel">
+      <div class="detail-empty" id="detailEmpty">
+        <div class="detail-empty-icon">✉️</div>
+        <div class="detail-empty-text">Select an email to view</div>
+      </div>
+      <div class="detail-content" id="detailContent" style="display:none">
+        <div class="detail-header">
+          <div class="detail-subject" id="detailSubject"></div>
+          <div class="detail-meta">
+            <div class="detail-meta-item"><strong id="detailFrom"></strong></div>
+            <div class="detail-meta-item" id="detailDate"></div>
+            <div id="detailTag"></div>
+          </div>
+        </div>
+        <div class="detail-body" id="detailBody"></div>
+        <div class="ai-panel">
+          <div class="ai-panel-tabs">
+            <div class="ai-tab active" onclick="switchTab('summary')" id="tab-summary">AI Summary</div>
+            <div class="ai-tab" onclick="switchTab('reply')" id="tab-reply">Draft Reply</div>
+            <div class="ai-tab" onclick="switchTab('extract')" id="tab-extract">Extract Data</div>
+          </div>
+          <div class="ai-panel-body" id="aiPanelBody">
+            <div class="ai-output" id="aiOutput">Select a tab above to use the AI assistant.</div>
+          </div>
+          <div class="ai-actions" id="aiActions">
+            <button class="btn btn-primary" id="aiActionBtn" onclick="runAI()">Summarise Email</button>
+            <button class="btn btn-ghost" id="copyBtn" onclick="copyOutput()" style="display:none">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+const CLIENT_ID = '612945003927-i59mnukbl933vc6c2s6hs351s6ud3v99.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let allEmails = [];
+let filteredEmails = [];
+let selectedEmail = null;
+let activeFilter = 'all';
+let activeTab = 'summary';
+let isLoading = false;
+let accessToken = null;
+let tokenClient = null;
+
+// ─── Category colours ────────────────────────────────────────────────────────
+const CAT_COLORS = {
+  Tenant: 'var(--tenant)',
+  Supplier: 'var(--supplier)',
+  Utility: 'var(--utility)',
+  Legal: 'var(--legal)',
+  Other: 'var(--other)'
+};
+
+// ─── Google Identity init ─────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  google.accounts.id.initialize({ client_id: CLIENT_ID });
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (resp) => {
+      if (resp.error) { showToast('❌ Auth error: ' + resp.error); return; }
+      accessToken = resp.access_token;
+      setSignedIn();
+      await fetchEmails();
+    }
+  });
+
+  // Check if we already have a token in session
+  const stored = sessionStorage.getItem('gmail_token');
+  if (stored) {
+    accessToken = stored;
+    setSignedIn();
+    fetchEmails();
+  }
+});
+
+function signIn() {
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
+}
+
+function setSignedIn() {
+  sessionStorage.setItem('gmail_token', accessToken);
+  const pill = document.getElementById('gmailStatus');
+  pill.classList.add('connected');
+  document.getElementById('gmailStatusText').textContent = 'double6lets@gmail.com';
+  document.getElementById('signInBtn').style.display = 'none';
+  document.getElementById('fetchBtn').style.display = 'inline-flex';
+}
+
+// ─── Gmail fetch via Google API ───────────────────────────────────────────────
+async function fetchEmails() {
+  if (!accessToken) { signIn(); return; }
+  if (isLoading) return;
+  isLoading = true;
+
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  document.getElementById('listSpinner').innerHTML = '<span class="spinner"></span>';
+  document.getElementById('emailListBody').innerHTML = `
+    <div class="loading-state"><span class="spinner"></span><span>Loading inbox…</span></div>`;
+
+  try {
+    // 1. Get list of message IDs
+    const listRes = await fetch(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&labelIds=INBOX',
+      { headers: { Authorization: 'Bearer ' + accessToken } }
+    );
+    if (listRes.status === 401) { accessToken = null; sessionStorage.removeItem('gmail_token'); signIn(); return; }
+    const listData = await listRes.json();
+    const ids = (listData.messages || []).map(m => m.id);
+
+    // 2. Fetch each message
+    const emails = await Promise.all(ids.map(id => fetchMessage(id)));
+    const validEmails = emails.filter(Boolean);
+
+    // 3. Categorise with Claude AI
+    allEmails = await categoriseEmails(validEmails);
+
+    renderEmails('all');
+    updateStats();
+    showToast('✅ ' + allEmails.length + ' emails loaded');
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById('emailListBody').innerHTML = `
+      <div class="connect-prompt">
+        <div class="connect-icon">⚠️</div>
+        <div class="connect-title">Error loading emails</div>
+        <div class="connect-desc">${escHtml(err.message)}</div>
+      </div>`;
+    showToast('❌ ' + err.message);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '↻ Refresh';
+  document.getElementById('listSpinner').innerHTML = '';
+  isLoading = false;
+}
+
+async function fetchMessage(id) {
+  try {
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+      { headers: { Authorization: 'Bearer ' + accessToken } }
+    );
+    const msg = await res.json();
+
+    const headers = msg.payload?.headers || [];
+    const get = name => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+
+    const subject = get('Subject') || '(no subject)';
+    const from = get('From');
+    const dateRaw = get('Date');
+    const date = formatDate(dateRaw);
+    const unread = (msg.labelIds || []).includes('UNREAD');
+
+    // Extract body
+    let body = '';
+    const extractBody = (parts) => {
+      for (const part of parts || []) {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          body += atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+        }
+        if (part.parts) extractBody(part.parts);
+      }
+    };
+    if (msg.payload?.body?.data) {
+      body = atob(msg.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+    } else {
+      extractBody(msg.payload?.parts);
+    }
+    body = body.replace(/\r\n/g, '\n').trim().substring(0, 600);
+
+    return { id, subject, from, date, preview: body.substring(0, 80), body, unread, category: 'Other', property: null, urgent: false, hasInvoice: false };
+  } catch { return null; }
+}
+
+function formatDate(raw) {
+  try {
+    const d = new Date(raw);
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) {
+      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  } catch { return raw?.substring(0, 10) || ''; }
+}
+
+// ─── Categorise via Claude ────────────────────────────────────────────────────
+async function categoriseEmails(emails) {
+  try {
+    const summaries = emails.map((e, i) =>
+      `${i}: FROM="${e.from}" SUBJECT="${e.subject}" BODY="${e.body.substring(0, 150)}"`
+    ).join('\n');
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: `You are a property management assistant for Double Six Lets Ltd (UK letting company).
+Properties: 39 Esher Road Liverpool L6 6DE, 49 Greene Way, 105 Ladywell (in conveyancing).
+
+For each email below, return a JSON array where each object has:
+- index (number)
+- category: "Tenant", "Supplier", "Utility", "Legal", or "Other"
+- property: "39 Esher Road", "49 Greene Way", "105 Ladywell", or null
+- urgent: boolean
+- hasInvoice: boolean
+
+Emails:
+${summaries}
+
+Return ONLY the JSON array.` }]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    const match = text.match(/\[[\s\S]*\]/);
+    if (match) {
+      const cats = JSON.parse(match[0]);
+      cats.forEach(c => {
+        if (emails[c.index]) {
+          emails[c.index].category = c.category || 'Other';
+          emails[c.index].property = c.property || null;
+          emails[c.index].urgent = !!c.urgent;
+          emails[c.index].hasInvoice = !!c.hasInvoice;
+        }
+      });
+    }
+  } catch(e) { console.warn('Categorisation failed:', e); }
+  return emails;
+}
+
+// ─── Render email list ────────────────────────────────────────────────────────
+function renderEmails(filter) {
+  activeFilter = filter;
+  filteredEmails = filter === 'all' ? allEmails : allEmails.filter(e => e.category === filter);
+
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('filter-' + filter)?.classList.add('active');
+  document.getElementById('listTitle').textContent = filter === 'all' ? 'INBOX' : filter.toUpperCase();
+
+  const body = document.getElementById('emailListBody');
+  if (!filteredEmails.length) {
+    body.innerHTML = `<div class="connect-prompt"><div class="connect-desc">No emails in this category.</div></div>`;
+    return;
+  }
+
+  body.innerHTML = filteredEmails.map((e, i) => `
+    <div class="email-item ${e.unread ? 'unread' : ''} ${selectedEmail?.id === e.id ? 'active' : ''}"
+         onclick="selectEmail(${i})"
+         style="animation-delay:${i * 0.03}s">
+      <div class="email-item-top">
+        <span class="email-sender">${escHtml(e.from)}</span>
+        <span class="email-time">${escHtml(e.date)}</span>
+      </div>
+      <div class="email-subject">${escHtml(e.subject)}</div>
+      <div class="email-preview">${escHtml(e.preview)}</div>
+      <span class="category-tag" style="background:${CAT_COLORS[e.category] || 'var(--other)'}22;color:${CAT_COLORS[e.category] || 'var(--other)'}">
+        ${e.category}${e.urgent ? ' · ⚡' : ''}
+      </span>
+      ${e.property ? `<span class="category-tag" style="background:rgba(200,240,76,0.08);color:var(--accent-dim);margin-left:4px">🏠 ${escHtml(e.property)}</span>` : ''}
+    </div>
+  `).join('');
+}
+
+function filterEmails(cat) { renderEmails(cat); }
+
+// ─── Properties ───────────────────────────────────────────────────────────────
+let activeProperty = null;
+
+function filterByProperty(keyword) {
+  activeProperty = keyword;
+  document.querySelectorAll('.property-card').forEach(c => c.classList.remove('active'));
+  if (keyword === '39 Esher') document.getElementById('prop-esher').classList.add('active');
+  if (keyword === '49 Greene') document.getElementById('prop-greene').classList.add('active');
+  if (keyword === '105 Ladywell') document.getElementById('prop-ladywell').classList.add('active');
+
+  if (!keyword) { renderEmails(activeFilter); return; }
+
+  const kw = keyword.toLowerCase();
+  filteredEmails = allEmails.filter(e =>
+    (e.subject + ' ' + e.body + ' ' + e.from + ' ' + (e.property||'')).toLowerCase().includes(kw)
+  );
+
+  document.getElementById('listTitle').textContent = keyword.toUpperCase();
+  const body = document.getElementById('emailListBody');
+  if (!filteredEmails.length) {
+    body.innerHTML = `<div class="connect-prompt"><div class="connect-desc">No emails found for ${keyword}.</div></div>`;
+    return;
+  }
+  body.innerHTML = filteredEmails.map((e, i) => `
+    <div class="email-item ${e.unread ? 'unread' : ''} ${selectedEmail?.id === e.id ? 'active' : ''}"
+         onclick="selectEmail(${i})" style="animation-delay:${i * 0.03}s">
+      <div class="email-item-top">
+        <span class="email-sender">${escHtml(e.from)}</span>
+        <span class="email-time">${escHtml(e.date)}</span>
+      </div>
+      <div class="email-subject">${escHtml(e.subject)}</div>
+      <div class="email-preview">${escHtml(e.preview)}</div>
+      <span class="category-tag" style="background:${CAT_COLORS[e.category]||'var(--other)'}22;color:${CAT_COLORS[e.category]||'var(--other)'}">
+        ${e.category}${e.urgent ? ' · ⚡' : ''}
+      </span>
+    </div>
+  `).join('');
+}
+
+const PROPERTY_CONTEXT = `
+Properties managed:
+- 39 Esher Road, Liverpool L6 6DE (active tenancy)
+- 49 Greene Way (active tenancy)
+- 105 Ladywell (in conveyancing)
+`;
+
+function updateStats() {
+  document.getElementById('stat-total').textContent = allEmails.length;
+  document.getElementById('stat-unread').textContent = allEmails.filter(e => e.unread).length;
+  document.getElementById('stat-urgent').textContent = allEmails.filter(e => e.urgent).length;
+  document.getElementById('stat-invoices').textContent = allEmails.filter(e => e.hasInvoice).length;
+  const cats = ['Tenant','Supplier','Utility','Legal','Other'];
+  document.getElementById('count-all').textContent = allEmails.length;
+  cats.forEach(cat => {
+    document.getElementById('count-' + cat).textContent = allEmails.filter(e => e.category === cat).length;
+  });
+}
+
+// ─── Select email ─────────────────────────────────────────────────────────────
+function selectEmail(idx) {
+  selectedEmail = filteredEmails[idx];
+  document.getElementById('detailEmpty').style.display = 'none';
+  document.getElementById('detailContent').style.display = 'flex';
+  document.getElementById('detailSubject').textContent = selectedEmail.subject;
+  document.getElementById('detailFrom').textContent = selectedEmail.from;
+  document.getElementById('detailDate').textContent = selectedEmail.date;
+  document.getElementById('detailBody').textContent = selectedEmail.body;
+
+  const cat = selectedEmail.category;
+  document.getElementById('detailTag').innerHTML = `
+    <span class="category-tag" style="background:${CAT_COLORS[cat]}22;color:${CAT_COLORS[cat]}">${cat}</span>
+    ${selectedEmail.property ? `<span class="category-tag" style="background:rgba(200,240,76,0.1);color:var(--accent-dim);margin-left:4px">🏠 ${escHtml(selectedEmail.property)}</span>` : ''}
+  `;
+
+  document.querySelectorAll('.email-item').forEach((el, i) => {
+    el.classList.toggle('active', filteredEmails[i]?.id === selectedEmail.id);
+  });
+
+  document.getElementById('aiOutput').textContent = 'Click the button below to analyse this email.';
+  document.getElementById('copyBtn').style.display = 'none';
+  switchTab('summary');
+}
+
+// ─── AI Panel ─────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  const labels = { summary: 'Summarise Email', reply: 'Draft Reply', extract: 'Extract Data' };
+  document.getElementById('aiActionBtn').textContent = labels[tab];
+  document.getElementById('aiOutput').textContent = 'Click the button below to ' + labels[tab].toLowerCase() + '.';
+  document.getElementById('copyBtn').style.display = 'none';
+}
+
+async function runAI() {
+  if (!selectedEmail) return;
+  const btn = document.getElementById('aiActionBtn');
+  const output = document.getElementById('aiOutput');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  output.className = 'ai-output loading';
+  output.textContent = 'Thinking…';
+
+  const prompts = {
+    summary: `You are a property management assistant for Double Six Lets Ltd, a UK letting company.\n${PROPERTY_CONTEXT}\nAnalyse this email and provide:\n1. A 2-3 sentence summary\n2. Which property this relates to (if identifiable)\n3. Key action required (if any)\n4. Priority level: Low / Medium / High / Urgent\n\nEmail from: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\nBody: ${selectedEmail.body}\n\nBe concise and practical.`,
+    reply: `You are a professional UK property letting agent for Double Six Lets Ltd.\n${PROPERTY_CONTEXT}\nDraft a professional, friendly reply to this email. Keep it concise. Sign off as "Double Six Lets Team".\n\nEmail from: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\nBody: ${selectedEmail.body}`,
+    extract: `Extract any structured data from this email relevant to a property letting company.\n${PROPERTY_CONTEXT}\nLook for: invoice amounts, dates, account numbers, meter readings, property addresses, tenant names, payment amounts, due dates, solicitor references (for 105 Ladywell conveyancing).\nReturn a clear list of key-value pairs.\n\nEmail from: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\nBody: ${selectedEmail.body}`
+  };
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompts[activeTab] }]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    output.className = 'ai-output';
+    output.textContent = text;
+    document.getElementById('copyBtn').style.display = 'inline-flex';
+  } catch (err) {
+    output.className = 'ai-output';
+    output.textContent = 'Error: ' + err.message;
+  }
+
+  btn.disabled = false;
+  const labels = { summary: 'Summarise Email', reply: 'Draft Reply', extract: 'Extract Data' };
+  btn.textContent = labels[activeTab];
+}
+
+function copyOutput() {
+  navigator.clipboard.writeText(document.getElementById('aiOutput').textContent)
+    .then(() => showToast('📋 Copied to clipboard'));
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+</script>
+let allEmails = [];
+let filteredEmails = [];
+let selectedEmail = null;
+let activeFilter = 'all';
+let activeTab = 'summary';
+let isLoading = false;
+
+// ─── Category colours ────────────────────────────────────────────────────────
+const CAT_COLORS = {
+  Tenant: 'var(--tenant)',
+  Supplier: 'var(--supplier)',
+  Utility: 'var(--utility)',
+  Legal: 'var(--legal)',
+  Other: 'var(--other)'
+};
+
+// ─── Gmail fetch via Claude API ───────────────────────────────────────────────
+async function fetchEmails() {
+  if (isLoading) return;
+  isLoading = true;
+
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Loading…';
+  document.getElementById('listSpinner').innerHTML = '<span class="spinner"></span>';
+
+  document.getElementById('emailListBody').innerHTML = `
+    <div class="loading-state">
+      <span class="spinner"></span>
+      <span>Connecting to Gmail…</span>
+    </div>`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: `You are an assistant that fetches emails from Gmail for a UK property letting company called Double Six Lets Ltd.
+The company manages: 39 Esher Road Liverpool L6 6DE, 49 Greene Way, and 105 Ladywell (in conveyancing).
+Use the Gmail MCP tool to fetch the 20 most recent emails from the inbox.
+For each email, return a JSON array with objects containing:
+- id: message id
+- subject: email subject
+- from: sender name/email
+- date: formatted date string (e.g. "12 Mar")
+- preview: first 80 chars of body
+- body: full email body (first 500 chars)
+- unread: boolean
+- category: one of "Tenant", "Supplier", "Utility", "Legal", "Other" based on content
+- property: best matching property ("39 Esher Road", "49 Greene Way", "105 Ladywell", or null)
+- urgent: boolean (true if needs urgent action)
+- hasInvoice: boolean (true if contains invoice/bill data)
+
+Return ONLY the JSON array, no other text.`,
+        messages: [{ role: 'user', content: 'Fetch the 20 most recent emails from my Gmail inbox and return as JSON.' }],
+        mcp_servers: [{ type: 'url', url: 'https://gmail.mcp.claude.com/mcp', name: 'gmail' }]
+      })
+    });
+
+    const data = await res.json();
+
+    // Extract text content from response
+    let text = '';
+    for (const block of data.content || []) {
+      if (block.type === 'text') text += block.text;
+      if (block.type === 'mcp_tool_result') {
+        const inner = block.content?.[0]?.text || '';
+        text += inner;
+      }
+    }
+
+    // Parse JSON from response
+    console.log('Raw API response:', JSON.stringify(data.content, null, 2));
+    console.log('Extracted text:', text);
+
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('No email data returned. Raw response: ' + text.substring(0, 200));
+
+    allEmails = JSON.parse(match[0]);
+
+    // Mark Gmail as connected
+    const statusPill = document.getElementById('gmailStatus');
+    statusPill.classList.add('connected');
+    statusPill.querySelector('span').textContent = 'Gmail Connected';
+
+    renderEmails('all');
+    updateStats();
+    showToast('✅ ' + allEmails.length + ' emails loaded');
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById('emailListBody').innerHTML = `
+      <div class="connect-prompt">
+        <div class="connect-icon">⚠️</div>
+        <div class="connect-title">Connection issue</div>
+        <div class="connect-desc">Could not load Gmail. Make sure you're connected in Claude settings and try again.<br><br><small style="color:var(--text-dim)">${err.message}</small></div>
+      </div>`;
+    showToast('❌ Failed to load emails');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Refresh';
+  document.getElementById('listSpinner').innerHTML = '';
+  isLoading = false;
+}
+
+// ─── Render email list ────────────────────────────────────────────────────────
+function renderEmails(filter) {
+  activeFilter = filter;
+  filteredEmails = filter === 'all' ? allEmails : allEmails.filter(e => e.category === filter);
+
+  // Update filter buttons
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('filter-' + filter)?.classList.add('active');
+  document.getElementById('listTitle').textContent = filter === 'all' ? 'INBOX' : filter.toUpperCase();
+
+  const body = document.getElementById('emailListBody');
+  if (!filteredEmails.length) {
+    body.innerHTML = `<div class="connect-prompt"><div class="connect-desc">No emails in this category.</div></div>`;
+    return;
+  }
+
+  body.innerHTML = filteredEmails.map((e, i) => `
+    <div class="email-item ${e.unread ? 'unread' : ''} ${selectedEmail?.id === e.id ? 'active' : ''}"
+         onclick="selectEmail(${i})"
+         style="animation-delay:${i * 0.03}s">
+      <div class="email-item-top">
+        <span class="email-sender">${escHtml(e.from)}</span>
+        <span class="email-time">${escHtml(e.date)}</span>
+      </div>
+      <div class="email-subject">${escHtml(e.subject)}</div>
+      <div class="email-preview">${escHtml(e.preview)}</div>
+      <span class="category-tag" style="background:${CAT_COLORS[e.category] || 'var(--other)'}22;color:${CAT_COLORS[e.category] || 'var(--other)'}">
+        ${e.category}${e.urgent ? ' · ⚡' : ''}
+      </span>
+      ${e.property ? `<span class="category-tag" style="background:rgba(200,240,76,0.08);color:var(--accent-dim);margin-left:4px">🏠 ${escHtml(e.property)}</span>` : ''}
+    </div>
+  `).join('');
+}
+
+function filterEmails(cat) {
+  renderEmails(cat);
+}
+
+// ─── Properties ───────────────────────────────────────────────────────────────
+const PROPERTIES = [
+  { id: 'esher',    label: '39 Esher Road',  keywords: ['esher', 'l6 6de', '39'],     status: 'active' },
+  { id: 'greene',   label: '49 Greene Way',  keywords: ['greene', 'greene way', '49'], status: 'active' },
+  { id: 'ladywell', label: '105 Ladywell',   keywords: ['ladywell', '105'],            status: 'purchasing' },
+];
+
+let activeProperty = null;
+
+function filterByProperty(keyword) {
+  activeProperty = keyword;
+
+  // Highlight active property card
+  document.querySelectorAll('.property-card').forEach(c => c.classList.remove('active'));
+  if (keyword === '39 Esher') document.getElementById('prop-esher').classList.add('active');
+  if (keyword === '49 Greene') document.getElementById('prop-greene').classList.add('active');
+  if (keyword === '105 Ladywell') document.getElementById('prop-ladywell').classList.add('active');
+
+  if (!keyword) {
+    renderEmails(activeFilter);
+    return;
+  }
+
+  const kw = keyword.toLowerCase();
+  filteredEmails = allEmails.filter(e =>
+    (e.subject + ' ' + e.body + ' ' + e.from).toLowerCase().includes(kw)
+  );
+
+  document.getElementById('listTitle').textContent = keyword.toUpperCase();
+  const body = document.getElementById('emailListBody');
+  if (!filteredEmails.length) {
+    body.innerHTML = `<div class="connect-prompt"><div class="connect-desc">No emails found mentioning ${keyword}.</div></div>`;
+    return;
+  }
+  body.innerHTML = filteredEmails.map((e, i) => `
+    <div class="email-item ${e.unread ? 'unread' : ''} ${selectedEmail?.id === e.id ? 'active' : ''}"
+         onclick="selectEmail(${i})"
+         style="animation-delay:${i * 0.03}s">
+      <div class="email-item-top">
+        <span class="email-sender">${escHtml(e.from)}</span>
+        <span class="email-time">${escHtml(e.date)}</span>
+      </div>
+      <div class="email-subject">${escHtml(e.subject)}</div>
+      <div class="email-preview">${escHtml(e.preview)}</div>
+      <span class="category-tag" style="background:${CAT_COLORS[e.category] || 'var(--other)'}22;color:${CAT_COLORS[e.category] || 'var(--other)'}">
+        ${e.category}${e.urgent ? ' · ⚡' : ''}
+      </span>
+    </div>
+  `).join('');
+}
+
+const PROPERTY_CONTEXT = `
+The company manages these properties:
+- 39 Esher Road, Liverpool L6 6DE (active tenancy)
+- 49 Greene Way (active tenancy)  
+- 105 Ladywell (currently in conveyancing / purchasing)
+`;
+
+function updateStats() {
+  document.getElementById('stat-total').textContent = allEmails.length;
+  document.getElementById('stat-unread').textContent = allEmails.filter(e => e.unread).length;
+  document.getElementById('stat-urgent').textContent = allEmails.filter(e => e.urgent).length;
+  document.getElementById('stat-invoices').textContent = allEmails.filter(e => e.hasInvoice).length;
+
+  const cats = ['Tenant','Supplier','Utility','Legal','Other'];
+  document.getElementById('count-all').textContent = allEmails.length;
+  cats.forEach(cat => {
+    document.getElementById('count-' + cat).textContent = allEmails.filter(e => e.category === cat).length;
+  });
+}
+
+// ─── Select email ─────────────────────────────────────────────────────────────
+function selectEmail(idx) {
+  selectedEmail = filteredEmails[idx];
+  document.getElementById('detailEmpty').style.display = 'none';
+  document.getElementById('detailContent').style.display = 'flex';
+
+  document.getElementById('detailSubject').textContent = selectedEmail.subject;
+  document.getElementById('detailFrom').textContent = selectedEmail.from;
+  document.getElementById('detailDate').textContent = selectedEmail.date;
+  document.getElementById('detailBody').textContent = selectedEmail.body;
+
+  const cat = selectedEmail.category;
+  document.getElementById('detailTag').innerHTML = `
+    <span class="category-tag" style="background:${CAT_COLORS[cat]}22;color:${CAT_COLORS[cat]}">${cat}</span>
+  `;
+
+  document.querySelectorAll('.email-item').forEach((el, i) => {
+    el.classList.toggle('active', filteredEmails[i]?.id === selectedEmail.id);
+  });
+
+  // Reset AI panel
+  document.getElementById('aiOutput').textContent = 'Click the button below to analyse this email.';
+  document.getElementById('copyBtn').style.display = 'none';
+  switchTab('summary');
+}
+
+// ─── AI Panel tabs ────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+
+  const btn = document.getElementById('aiActionBtn');
+  const labels = { summary: 'Summarise Email', reply: 'Draft Reply', extract: 'Extract Data' };
+  btn.textContent = labels[tab];
+
+  document.getElementById('aiOutput').textContent = 'Click the button below to ' + labels[tab].toLowerCase() + '.';
+  document.getElementById('copyBtn').style.display = 'none';
+}
+
+// ─── Run AI action ────────────────────────────────────────────────────────────
+async function runAI() {
+  if (!selectedEmail) return;
+
+  const btn = document.getElementById('aiActionBtn');
+  const output = document.getElementById('aiOutput');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  output.className = 'ai-output loading';
+  output.textContent = 'Thinking…';
+
+  const prompts = {
+    summary: `You are a property management assistant for Double Six Lets Ltd, a UK letting company.
+${PROPERTY_CONTEXT}
+Analyse this email and provide:
+1. A 2-3 sentence summary
+2. Which property this relates to (if identifiable)
+3. Key action required (if any)
+4. Priority level: Low / Medium / High / Urgent
+
+Email from: ${selectedEmail.from}
+Subject: ${selectedEmail.subject}
+Body: ${selectedEmail.body}
+
+Be concise and practical.`,
+
+    reply: `You are a professional UK property letting agent for Double Six Lets Ltd.
+${PROPERTY_CONTEXT}
+Draft a professional, friendly reply to this email. Keep it concise.
+Sign off as "Double Six Lets Team".
+
+Email from: ${selectedEmail.from}
+Subject: ${selectedEmail.subject}
+Body: ${selectedEmail.body}`,
+
+    extract: `Extract any structured data from this email relevant to a property letting company.
+${PROPERTY_CONTEXT}
+Look for: invoice amounts, dates, account numbers, meter readings, property addresses, tenant names, payment amounts, due dates, solicitor references (for 105 Ladywell conveyancing).
+Return a clear list of key-value pairs. If nothing to extract, say so briefly.
+
+Email from: ${selectedEmail.from}
+Subject: ${selectedEmail.subject}
+Body: ${selectedEmail.body}`
+  };
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompts[activeTab] }]
+      })
+    });
+
+    const data = await res.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    output.className = 'ai-output';
+    output.textContent = text;
+    document.getElementById('copyBtn').style.display = 'inline-flex';
+
+  } catch (err) {
+    output.className = 'ai-output';
+    output.textContent = 'Error: ' + err.message;
+  }
+
+  btn.disabled = false;
+  const labels = { summary: 'Summarise Email', reply: 'Draft Reply', extract: 'Extract Data' };
+  btn.textContent = labels[activeTab];
+}
+
+function copyOutput() {
+  const text = document.getElementById('aiOutput').textContent;
+  navigator.clipboard.writeText(text).then(() => showToast('📋 Copied to clipboard'));
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+</script>
+</body>
+</html>
