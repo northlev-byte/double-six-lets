@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Double Six Lets — Property Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg:#0f0f0f;--surface:#181818;--surface2:#222222;--border:#2a2a2a;
+    --accent:#c8f04c;--accent-dim:#a0c038;
+    --text:#f0f0f0;--text-muted:#888;--text-dim:#555;
+    --tenant:#4cf0c8;--supplier:#f0c84c;--utility:#c84cf0;--legal:#f04c4c;--other:#888;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(rgba(200,240,76,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(200,240,76,.03) 1px,transparent 1px);
+    background-size:40px 40px;}
+  .app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh;}
+
+  /* Header */
+  header{display:flex;align-items:center;justify-content:space-between;padding:13px 22px;border-bottom:1px solid var(--border);background:rgba(15,15,15,.97);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100;}
+  .brand{display:flex;align-items:center;gap:11px;}
+  .brand-mark{width:33px;height:33px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:14px;color:#0f0f0f;font-weight:700;}
+  .brand-name{font-family:'DM Serif Display',serif;font-size:17px;}
+  .brand-sub{font-size:10px;color:var(--text-muted);letter-spacing:1.2px;text-transform:uppercase;}
+  .header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .status-pill{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);}
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--text-dim);}
+  .status-pill.connected .dot{background:var(--accent);box-shadow:0 0 6px var(--accent);}
+  .status-pill.connected{color:var(--text);border-color:rgba(200,240,76,.3);}
+  .sheets-pill{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;font-size:12px;font-weight:500;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;transition:all .15s;}
+  .sheets-pill.linked{border-color:rgba(76,240,200,.3);color:var(--tenant);}
+  .sheets-pill:hover{border-color:var(--accent);}
+  .btn{padding:6px 13px;border-radius:8px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+  .btn-primary{background:var(--accent);color:#0f0f0f;}
+  .btn-primary:hover{background:var(--accent-dim);transform:translateY(-1px);}
+  .btn-ghost{background:transparent;color:var(--text-muted);border:1px solid var(--border);}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-green{background:rgba(76,240,200,.15);color:var(--tenant);border:1px solid rgba(76,240,200,.3);}
+  .btn-green:hover{background:rgba(76,240,200,.25);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;}
+
+  /* Layout */
+  .main{display:flex;flex:1;height:calc(100vh - 63px);overflow:hidden;}
+
+  /* Sidebar */
+  .sidebar{width:245px;min-width:245px;border-right:1px solid var(--border);background:var(--surface);overflow-y:auto;display:flex;flex-direction:column;}
+  .sidebar-section{padding:11px 11px 9px;border-bottom:1px solid var(--border);}
+  .sidebar-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:7px;font-weight:600;}
+  .filter-btn{display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 9px;border-radius:7px;border:none;background:transparent;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;text-align:left;transition:all .12s;margin-bottom:2px;}
+  .filter-btn:hover{background:var(--surface2);color:var(--text);}
+  .filter-btn.active{background:rgba(200,240,76,.1);color:var(--accent);}
+  .filter-left{display:flex;align-items:center;gap:8px;}
+  .filter-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .filter-count{font-size:11px;padding:1px 7px;border-radius:10px;background:var(--surface2);color:var(--text-muted);}
+  .filter-btn.active .filter-count{background:rgba(200,240,76,.15);color:var(--accent);}
+  .property-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:all .12s;}
+  .property-card:hover{border-color:rgba(200,240,76,.3);}
+  .property-card.active{border-color:var(--accent);background:rgba(200,240,76,.05);}
+  .property-card.purchasing{opacity:.7;}
+  .property-name{font-size:13px;font-weight:600;}
+  .property-addr{font-size:11px;color:var(--text-muted);margin-top:2px;}
+  .property-status{display:inline-block;font-size:10px;padding:2px 7px;border-radius:4px;margin-top:5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+  .status-active{background:rgba(76,240,200,.15);color:var(--tenant);}
+  .status-purchasing{background:rgba(200,240,76,.15);color:var(--accent);}
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;}
+  .stat-value{font-size:18px;font-family:'DM Serif Display',serif;color:var(--accent);line-height:1;}
+  .stat-label{font-size:10px;color:var(--text-muted);margin-top:2px;}
+
+  /* Email list */
+  .email-list{width:305px;min-width:305px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+  .email-list-header{padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);flex-shrink:0;}
+  .email-list-title{font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;}
+  .search-bar{display:flex;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+  .search-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:5px 9px;outline:none;}
+  .search-input:focus{border-color:rgba(200,240,76,.3);}
+  .search-input::placeholder{color:var(--text-dim);}
+  .email-list-body{flex:1;overflow-y:auto;}
+  .email-item{padding:10px 13px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;animation:fadeIn .2s ease both;}
+  .email-item:hover{background:var(--surface);}
+  .email-item.active{background:rgba(200,240,76,.05);border-left:2px solid var(--accent);padding-left:11px;}
+  .email-item.unread .email-sender{font-weight:600;color:var(--text);}
+  .email-item-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;}
+  .email-sender{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px;}
+  .email-time{font-size:11px;color:var(--text-dim);flex-shrink:0;}
+  .email-subject{font-size:13px;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .email-preview{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .email-tags{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap;}
+  .tag{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;}
+  .urgent-tag{background:rgba(240,76,76,.15);color:var(--legal);}
+  .invoice-tag{background:rgba(240,200,76,.12);color:var(--supplier);}
+  .logged-tag{background:rgba(76,240,200,.12);color:var(--tenant);}
+
+  /* Detail */
+  .detail-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+  .detail-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text-dim);}
+  .detail-content{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+  .detail-header{padding:16px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+  .detail-subject{font-family:'DM Serif Display',serif;font-size:18px;margin-bottom:8px;line-height:1.25;}
+  .detail-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .detail-meta-item{font-size:12px;color:var(--text-muted);}
+  .detail-meta-item strong{color:var(--text);}
+  .detail-body-wrap{flex:1;overflow-y:auto;}
+  .detail-body{padding:16px 20px;line-height:1.75;color:var(--text-muted);font-size:13px;white-space:pre-wrap;word-break:break-word;}
+  .detail-body-html{padding:16px 20px;}
+  .detail-body-html a{color:var(--accent);}
+
+  /* AI Panel */
+  .ai-panel{border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;max-height:380px;}
+  .ai-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 13px;}
+  .ai-tab{padding:9px 12px;font-size:12px;font-weight:500;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
+  .ai-tab:hover{color:var(--text-muted);}
+  .ai-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .ai-body{padding:11px 13px;overflow-y:auto;flex:1;}
+  .ai-output{font-size:13px;line-height:1.7;color:var(--text-muted);white-space:pre-wrap;word-break:break-word;}
+  .ai-output.loading{color:var(--text-dim);font-style:italic;}
+  .reply-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 11px;resize:vertical;min-height:85px;outline:none;transition:border-color .15s;line-height:1.6;}
+  .reply-textarea:focus{border-color:rgba(200,240,76,.4);}
+  .ai-actions{display:flex;gap:7px;padding:8px 13px;border-top:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;}
+
+  /* Log panel */
+  .log-panel{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-top:8px;}
+  .log-panel-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:9px;}
+  .log-fields{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:9px;}
+  .log-field{display:flex;flex-direction:column;gap:3px;}
+  .log-field label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;}
+  .log-field.full{grid-column:1/-1;}
+  .log-input{background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:5px 8px;outline:none;}
+  .log-input:focus{border-color:rgba(200,240,76,.4);}
+  select.log-input{cursor:pointer;}
+
+  /* States */
+  .loading-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:50px 20px;color:var(--text-muted);}
+  .connect-prompt{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:50px 24px;text-align:center;}
+  .connect-icon{font-size:34px;}
+  .connect-title{font-family:'DM Serif Display',serif;font-size:17px;}
+  .connect-desc{font-size:13px;color:var(--text-muted);line-height:1.6;max-width:220px;}
+
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .spinner{width:15px;height:15px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;flex-shrink:0;}
+  .loading-state .spinner{width:22px;height:22px;}
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:13px;z-index:999;animation:fadeUp .2s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+  ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="brand-mark">66</div>
+      <div><div class="brand-name">Double Six Lets</div><div class="brand-sub">Property Agent</div></div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill" id="gmailStatus"><div class="dot"></div><span id="gmailStatusText">Not signed in</span></div>
+      <div class="sheets-pill" id="sheetsPill" onclick="openSheet()" title="Click to open spreadsheet">📊 <span id="sheetsPillText">No sheet yet</span></div>
+      <button class="btn btn-ghost" id="signInBtn" onclick="signIn()">Sign in with Google</button>
+      <button class="btn btn-ghost" onclick="exportExcel()" id="exportBtn" style="display:none">⬇ Excel</button>
+      <button class="btn btn-primary" id="fetchBtn" onclick="fetchEmails()" style="display:none">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Categories</div>
+        <button class="filter-btn active" onclick="filterByCategory('all')" id="filter-all"><span class="filter-left"><span class="filter-dot" style="background:#888"></span>All Emails</span><span class="filter-count" id="count-all">0</span></button>
+        <button class="filter-btn" onclick="filterByCategory('Tenant')" id="filter-Tenant"><span class="filter-left"><span class="filter-dot" style="background:var(--tenant)"></span>Tenants</span><span class="filter-count" id="count-Tenant">0</span></button>
+        <button class="filter-btn" onclick="filterByCategory('Supplier')" id="filter-Supplier"><span class="filter-left"><span class="filter-dot" style="background:var(--supplier)"></span>Suppliers</span><span class="filter-count" id="count-Supplier">0</span></button>
+        <button class="filter-btn" onclick="filterByCategory('Utility')" id="filter-Utility"><span class="filter-left"><span class="filter-dot" style="background:var(--utility)"></span>Utilities</span><span class="filter-count" id="count-Utility">0</span></button>
+        <button class="filter-btn" onclick="filterByCategory('Legal')" id="filter-Legal"><span class="filter-left"><span class="filter-dot" style="background:var(--legal)"></span>Legal</span><span class="filter-count" id="count-Legal">0</span></button>
+        <button class="filter-btn" onclick="filterByCategory('Other')" id="filter-Other"><span class="filter-left"><span class="filter-dot" style="background:var(--other)"></span>Other</span><span class="filter-count" id="count-Other">0</span></button>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Properties</div>
+        <div class="property-card" onclick="filterByProperty('esher')" id="prop-esher"><div class="property-name">39 Esher Road</div><div class="property-addr">Liverpool, L6 6DE</div><span class="property-status status-active">Active</span></div>
+        <div class="property-card" onclick="filterByProperty('greene')" id="prop-greene"><div class="property-name">49 Greene Way</div><div class="property-addr">Double Six Lets</div><span class="property-status status-active">Active</span></div>
+        <div class="property-card purchasing" onclick="filterByProperty('ladywell')" id="prop-ladywell"><div class="property-name">105 Ladywell</div><div class="property-addr">In conveyancing</div><span class="property-status status-purchasing">⏳ Purchasing</span></div>
+        <button class="filter-btn" onclick="filterByProperty(null)" style="margin-top:4px"><span class="filter-left"><span style="font-size:11px">↩</span>Show all</span></button>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Overview</div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Loaded</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-unread">—</div><div class="stat-label">Unread</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-urgent">—</div><div class="stat-label">Urgent</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-invoices">—</div><div class="stat-label">Invoices</div></div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Finance Log</div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value" id="stat-logged">—</div><div class="stat-label">Logged</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-spend" style="font-size:15px">—</div><div class="stat-label">Total £</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="email-list">
+      <div class="email-list-header"><span class="email-list-title" id="listTitle">INBOX</span><span id="listSpinner"></span></div>
+      <div class="search-bar"><input class="search-input" id="searchInput" placeholder="Search emails…" oninput="renderEmails()"></div>
+      <div class="email-list-body" id="emailListBody">
+        <div class="connect-prompt"><div class="connect-icon">📬</div><div class="connect-title">Ready</div><div class="connect-desc">Sign in with Google to load your inbox and connect your finance sheet.</div></div>
+      </div>
+    </div>
+
+    <div class="detail-panel">
+      <div class="detail-empty" id="detailEmpty"><div style="font-size:38px;opacity:.2">✉️</div><div style="font-size:13px;color:var(--text-dim)">Select an email to view</div></div>
+      <div class="detail-content" id="detailContent" style="display:none">
+        <div class="detail-header">
+          <div class="detail-subject" id="detailSubject"></div>
+          <div class="detail-meta">
+            <div class="detail-meta-item"><strong id="detailFrom"></strong></div>
+            <div class="detail-meta-item" id="detailDate"></div>
+            <div id="detailTags"></div>
+          </div>
+        </div>
+        <div class="detail-body-wrap" id="detailBodyWrap"></div>
+        <div class="ai-panel">
+          <div class="ai-tabs">
+            <div class="ai-tab active" onclick="switchTab('summary')" id="tab-summary">✦ Summary</div>
+            <div class="ai-tab" onclick="switchTab('reply')" id="tab-reply">✉ Draft Reply</div>
+            <div class="ai-tab" onclick="switchTab('extract')" id="tab-extract">📊 Extract & Log</div>
+          </div>
+          <div class="ai-body" id="aiBody">
+            <div class="ai-output" id="aiOutput">Select a tab and click the button to analyse this email.</div>
+            <textarea class="reply-textarea" id="replyTextarea" style="display:none"></textarea>
+            <div id="logPanel" style="display:none"></div>
+          </div>
+          <div class="ai-actions">
+            <button class="btn btn-primary" id="aiActionBtn" onclick="runAI()">Summarise</button>
+            <button class="btn btn-ghost" id="copyBtn" onclick="copyOutput()" style="display:none">Copy</button>
+            <button class="btn btn-green" id="logBtn" onclick="logToSheets()" style="display:none">📊 Log to Sheets</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLIENT_ID = '612945003927-i59mnukbl933vc6c2s6hs351s6ud3v99.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+const SHEET_HEADERS = ['Date','Type','Category','Description','Amount (£)','VAT (£)','Net (£)','Property','From','Subject','Status','Logged At'];
+const SHEET_TABS = ['All Transactions','39 Esher Road','49 Greene Way','105 Ladywell'];
+const PROP_LIST = ['39 Esher Road','49 Greene Way','105 Ladywell','General'];
+const CAT_COLORS = {Tenant:'var(--tenant)',Supplier:'var(--supplier)',Utility:'var(--utility)',Legal:'var(--legal)',Other:'var(--other)'};
+const PROP_KW = {esher:['esher','l6 6de'],greene:['greene way','49 greene'],ladywell:['ladywell','105 ladywell']};
+const PROP_LABELS = {esher:'39 Esher Road',greene:'49 Greene Way',ladywell:'105 Ladywell'};
+const PROP_CTX = 'Properties managed by Double Six Lets Ltd:\n- 39 Esher Road, Liverpool L6 6DE (active tenancy)\n- 49 Greene Way (active tenancy)\n- 105 Ladywell (currently in conveyancing)';
+
+let allEmails=[],filteredEmails=[],selectedEmail=null;
+let activeFilter='all',activeProp=null,activeTab='summary';
+let isLoading=false,accessToken=null,tokenClient=null;
+let spreadsheetId=localStorage.getItem('dsl_sheet_id')||null;
+let transactions=JSON.parse(localStorage.getItem('dsl_tx')||'[]');
+let extractedData=null;
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load',()=>{
+  const tryInit=()=>{
+    if(typeof google==='undefined'){setTimeout(tryInit,200);return;}
+    google.accounts.id.initialize({client_id:CLIENT_ID});
+    tokenClient=google.accounts.oauth2.initTokenClient({
+      client_id:CLIENT_ID,scope:SCOPES,
+      callback:async(resp)=>{
+        if(resp.error){showToast('❌ Auth error: '+resp.error);return;}
+        accessToken=resp.access_token;
+        sessionStorage.setItem('dsl_token',accessToken);
+        setSignedIn();
+        await ensureSheet();
+        await fetchEmails();
+      }
+    });
+    const stored=sessionStorage.getItem('dsl_token');
+    if(stored){accessToken=stored;setSignedIn();if(spreadsheetId)updateSheetPill();}
+    updateLogStats();
+  };
+  tryInit();
+});
+
+function signIn(){if(!tokenClient){showToast('Loading…');return;}tokenClient.requestAccessToken({prompt:'select_account'});}
+
+function setSignedIn(){
+  document.getElementById('gmailStatus').classList.add('connected');
+  document.getElementById('gmailStatusText').textContent='double6lets@gmail.com';
+  document.getElementById('signInBtn').style.display='none';
+  document.getElementById('fetchBtn').style.display='inline-flex';
+  document.getElementById('exportBtn').style.display='inline-flex';
+}
+
+function updateSheetPill(){
+  document.getElementById('sheetsPill').classList.add('linked');
+  document.getElementById('sheetsPillText').textContent='Sheet Linked ✓';
+}
+function openSheet(){if(spreadsheetId)window.open('https://docs.google.com/spreadsheets/d/'+spreadsheetId,'_blank');else showToast('Sign in first');}
+
+// ── Spreadsheet creation ───────────────────────────────────────────────────────
+async function ensureSheet(){
+  if(spreadsheetId){updateSheetPill();return;}
+  showToast('📊 Creating finance spreadsheet…');
+  try{
+    const res=await gapi('https://sheets.googleapis.com/v4/spreadsheets','POST',{
+      properties:{title:'Double Six Lets — Finance Tracker'},
+      sheets:SHEET_TABS.map((t,i)=>({properties:{sheetId:i,title:t,index:i}}))
+    });
+    spreadsheetId=res.spreadsheetId;
+    localStorage.setItem('dsl_sheet_id',spreadsheetId);
+
+    // Write headers
+    for(const tab of SHEET_TABS){
+      await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent("'"+tab+"'!A1")}?valueInputOption=USER_ENTERED`,'PUT',{values:[SHEET_HEADERS]});
+    }
+
+    // Bold + colour headers
+    await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,'POST',{
+      requests:SHEET_TABS.map((_,i)=>({
+        repeatCell:{
+          range:{sheetId:i,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:SHEET_HEADERS.length},
+          cell:{userEnteredFormat:{backgroundColor:{red:.16,green:.16,blue:.16},textFormat:{bold:true,foregroundColor:{red:.78,green:.94,blue:.3}}}},
+          fields:'userEnteredFormat(backgroundColor,textFormat)'
+        }
+      }))
+    });
+
+    updateSheetPill();
+    showToast('✅ Finance spreadsheet created!');
+  }catch(e){console.error(e);showToast('⚠️ Sheet creation failed — check permissions');}
+}
+
+// ── Gmail ─────────────────────────────────────────────────────────────────────
+async function fetchEmails(){
+  if(!accessToken){signIn();return;}
+  if(isLoading)return;
+  isLoading=true;
+  const btn=document.getElementById('fetchBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  document.getElementById('listSpinner').innerHTML='<span class="spinner"></span>';
+  document.getElementById('emailListBody').innerHTML='<div class="loading-state"><span class="spinner"></span><span>Loading inbox…</span></div>';
+
+  try{
+    const lr=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&labelIds=INBOX',{headers:{Authorization:'Bearer '+accessToken}});
+    if(lr.status===401){handleExpiry();return;}
+    const ld=await lr.json();
+    const ids=(ld.messages||[]).map(m=>m.id);
+    document.getElementById('emailListBody').innerHTML=`<div class="loading-state"><span class="spinner"></span><span>Fetching ${ids.length} emails…</span></div>`;
+    let emails=[];
+    for(let i=0;i<ids.length;i+=10){
+      const batch=await Promise.all(ids.slice(i,i+10).map(id=>fetchMsg(id)));
+      emails=emails.concat(batch.filter(Boolean));
+    }
+    document.getElementById('emailListBody').innerHTML='<div class="loading-state"><span class="spinner"></span><span>Categorising with AI…</span></div>';
+    allEmails=await categorise(emails);
+    // Mark logged
+    transactions.forEach(t=>{const e=allEmails.find(x=>x.id===t.emailId);if(e)e.logged=true;});
+    renderEmails();updateStats();updateLogStats();
+    showToast('✅ '+allEmails.length+' emails loaded');
+  }catch(err){
+    console.error(err);
+    document.getElementById('emailListBody').innerHTML=`<div class="connect-prompt"><div class="connect-icon">⚠️</div><div class="connect-title">Error</div><div class="connect-desc">${escHtml(err.message)}</div></div>`;
+    showToast('❌ '+err.message);
+  }
+  btn.disabled=false;btn.innerHTML='↻ Refresh';
+  document.getElementById('listSpinner').innerHTML='';
+  isLoading=false;
+}
+
+function handleExpiry(){
+  accessToken=null;sessionStorage.removeItem('dsl_token');
+  document.getElementById('signInBtn').style.display='inline-flex';
+  document.getElementById('fetchBtn').style.display='none';
+  document.getElementById('gmailStatus').classList.remove('connected');
+  document.getElementById('gmailStatusText').textContent='Not signed in';
+  showToast('Session expired — sign in again');isLoading=false;
+}
+
+async function fetchMsg(id){
+  try{
+    const res=await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,{headers:{Authorization:'Bearer '+accessToken}});
+    const msg=await res.json();
+    const hdrs=msg.payload?.headers||[];
+    const get=n=>hdrs.find(h=>h.name.toLowerCase()===n.toLowerCase())?.value||'';
+    const subject=get('Subject')||'(no subject)';
+    const from=get('From');
+    const rawDate=get('Date');
+    const date=fmtDate(rawDate);
+    const unread=(msg.labelIds||[]).includes('UNREAD');
+    let bodyText='',bodyHtml='';
+    const extr=parts=>{for(const p of parts||[]){
+      if(p.mimeType==='text/plain'&&p.body?.data&&!bodyText)bodyText=b64d(p.body.data);
+      if(p.mimeType==='text/html'&&p.body?.data&&!bodyHtml)bodyHtml=b64d(p.body.data);
+      if(p.parts)extr(p.parts);
+    }};
+    if(msg.payload?.body?.data){const d=b64d(msg.payload.body.data);if(msg.payload.mimeType==='text/html')bodyHtml=d;else bodyText=d;}
+    extr(msg.payload?.parts);
+    const body=bodyText||bodyHtml.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+    return{id,subject,from,date,rawDate,preview:body.substring(0,90).trim(),body:body.substring(0,1000),bodyHtml:bodyHtml.substring(0,8000),unread,category:'Other',property:null,urgent:false,hasInvoice:false,logged:false};
+  }catch{return null;}
+}
+
+function b64d(d){try{return decodeURIComponent(escape(atob(d.replace(/-/g,'+').replace(/_/g,'/'))));}catch{return atob(d.replace(/-/g,'+').replace(/_/g,'/'));}}
+function fmtDate(r){try{const d=new Date(r),n=new Date();if(d.toDateString()===n.toDateString())return d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}catch{return '';}}
+
+// ── Categorise ────────────────────────────────────────────────────────────────
+async function categorise(emails){
+  try{
+    const sums=emails.map((e,i)=>`${i}|FROM:${e.from}|SUBJ:${e.subject}|BODY:${e.body.substring(0,120)}`).join('\n');
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',max_tokens:2000,
+      messages:[{role:'user',content:`Double Six Lets Ltd — UK property letting company.\n${PROP_CTX}\n\nFor each email return JSON array:\n- index: number\n- category: "Tenant"|"Supplier"|"Utility"|"Legal"|"Other"\n- property: "39 Esher Road"|"49 Greene Way"|"105 Ladywell"|null\n- urgent: boolean\n- hasInvoice: boolean (true if bill/invoice/payment amount present)\n\nEmails:\n${sums}\n\nReturn ONLY valid JSON array.`}]
+    })});
+    const data=await res.json();
+    const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const m=txt.match(/\[[\s\S]*?\]/);
+    if(m)JSON.parse(m[0]).forEach(c=>{if(emails[c.index])Object.assign(emails[c.index],{category:c.category||'Other',property:c.property||null,urgent:!!c.urgent,hasInvoice:!!c.hasInvoice});});
+  }catch(e){console.warn('Categorise failed:',e);}
+  return emails;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function getFiltered(){
+  let em=allEmails;
+  if(activeFilter!=='all')em=em.filter(e=>e.category===activeFilter);
+  if(activeProp){const kws=PROP_KW[activeProp]||[];em=em.filter(e=>kws.some(k=>(e.subject+' '+e.body+' '+e.from+' '+(e.property||'')).toLowerCase().includes(k)));}
+  const q=document.getElementById('searchInput')?.value?.toLowerCase();
+  if(q)em=em.filter(e=>(e.subject+e.from+e.body).toLowerCase().includes(q));
+  return em;
+}
+
+function renderEmails(){
+  filteredEmails=getFiltered();
+  const body=document.getElementById('emailListBody');
+  if(!filteredEmails.length){body.innerHTML='<div class="connect-prompt"><div class="connect-desc">No emails match this filter.</div></div>';return;}
+  body.innerHTML=filteredEmails.map((e,i)=>{
+    const col=CAT_COLORS[e.category]||'var(--other)';
+    return`<div class="email-item ${e.unread?'unread':''} ${selectedEmail?.id===e.id?'active':''}" onclick="selectEmail(${i})" style="animation-delay:${Math.min(i,20)*.025}s">
+      <div class="email-item-top"><span class="email-sender">${escHtml(friendlyFrom(e.from))}</span><span class="email-time">${escHtml(e.date)}</span></div>
+      <div class="email-subject">${escHtml(e.subject)}</div>
+      <div class="email-preview">${escHtml(e.preview)}</div>
+      <div class="email-tags">
+        <span class="tag" style="background:${col}22;color:${col}">${e.category}</span>
+        ${e.urgent?'<span class="tag urgent-tag">⚡ Urgent</span>':''}
+        ${e.hasInvoice?'<span class="tag invoice-tag">🧾 Invoice</span>':''}
+        ${e.logged?'<span class="tag logged-tag">✓ Logged</span>':''}
+        ${e.property?`<span class="tag" style="background:rgba(200,240,76,.08);color:var(--accent-dim)">🏠 ${escHtml(e.property)}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function friendlyFrom(f){const m=f.match(/^"?([^"<]+)"?\s*</);return m?m[1].trim():f.replace(/<.*>/,'').trim()||f;}
+
+function updateStats(){
+  document.getElementById('stat-total').textContent=allEmails.length;
+  document.getElementById('stat-unread').textContent=allEmails.filter(e=>e.unread).length;
+  document.getElementById('stat-urgent').textContent=allEmails.filter(e=>e.urgent).length;
+  document.getElementById('stat-invoices').textContent=allEmails.filter(e=>e.hasInvoice).length;
+  document.getElementById('count-all').textContent=allEmails.length;
+  ['Tenant','Supplier','Utility','Legal','Other'].forEach(c=>document.getElementById('count-'+c).textContent=allEmails.filter(e=>e.category===c).length);
+}
+function updateLogStats(){
+  document.getElementById('stat-logged').textContent=transactions.length;
+  const tot=transactions.reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+  document.getElementById('stat-spend').textContent=tot>0?'£'+tot.toFixed(0):'—';
+}
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+function filterByCategory(cat){
+  activeFilter=cat;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('filter-'+cat)?.classList.add('active');
+  document.getElementById('listTitle').textContent=cat==='all'?'INBOX':cat.toUpperCase();
+  renderEmails();
+}
+function filterByProperty(pid){
+  activeProp=pid;
+  document.querySelectorAll('.property-card').forEach(c=>c.classList.remove('active'));
+  if(pid)document.getElementById('prop-'+pid)?.classList.add('active');
+  document.getElementById('listTitle').textContent=pid?PROP_LABELS[pid].toUpperCase():'INBOX';
+  renderEmails();
+}
+
+// ── Select email ──────────────────────────────────────────────────────────────
+function selectEmail(idx){
+  selectedEmail=filteredEmails[idx];
+  document.getElementById('detailEmpty').style.display='none';
+  document.getElementById('detailContent').style.display='flex';
+  document.getElementById('detailSubject').textContent=selectedEmail.subject;
+  document.getElementById('detailFrom').textContent=selectedEmail.from;
+  document.getElementById('detailDate').textContent=selectedEmail.date;
+
+  const bw=document.getElementById('detailBodyWrap');
+  if(selectedEmail.bodyHtml){
+    const div=document.createElement('div');
+    div.className='detail-body detail-body-html';
+    div.innerHTML=selectedEmail.bodyHtml;
+    div.querySelectorAll('a').forEach(a=>a.setAttribute('target','_blank'));
+    bw.innerHTML='';bw.appendChild(div);
+  }else{
+    bw.innerHTML=`<div class="detail-body">${escHtml(selectedEmail.body)}</div>`;
+  }
+
+  const cat=selectedEmail.category,col=CAT_COLORS[cat]||'var(--other)';
+  document.getElementById('detailTags').innerHTML=`
+    <span class="tag" style="background:${col}22;color:${col}">${cat}</span>
+    ${selectedEmail.property?`<span class="tag" style="background:rgba(200,240,76,.1);color:var(--accent-dim);margin-left:4px">🏠 ${escHtml(selectedEmail.property)}</span>`:''}
+    ${selectedEmail.urgent?'<span class="tag urgent-tag" style="margin-left:4px">⚡ Urgent</span>':''}
+    ${selectedEmail.logged?'<span class="tag logged-tag" style="margin-left:4px">✓ Logged</span>':''}
+  `;
+  document.querySelectorAll('.email-item').forEach((el,i)=>el.classList.toggle('active',filteredEmails[i]?.id===selectedEmail.id));
+  resetAI();
+}
+
+// ── AI ────────────────────────────────────────────────────────────────────────
+function resetAI(){
+  extractedData=null;
+  document.getElementById('aiOutput').textContent='Select a tab and click the button to analyse this email.';
+  document.getElementById('aiOutput').style.display='block';
+  document.getElementById('replyTextarea').style.display='none';
+  document.getElementById('logPanel').style.display='none';
+  document.getElementById('copyBtn').style.display='none';
+  document.getElementById('logBtn').style.display='none';
+  switchTab('summary');
+}
+
+function switchTab(tab){
+  activeTab=tab;
+  document.querySelectorAll('.ai-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  const labs={summary:'Summarise',reply:'Draft Reply',extract:'Extract & Log'};
+  document.getElementById('aiActionBtn').textContent=labs[tab];
+  document.getElementById('aiOutput').textContent='Click the button below to '+labs[tab].toLowerCase()+'.';
+  document.getElementById('aiOutput').style.display='block';
+  document.getElementById('replyTextarea').style.display='none';
+  document.getElementById('logPanel').style.display='none';
+  document.getElementById('copyBtn').style.display='none';
+  document.getElementById('logBtn').style.display='none';
+  extractedData=null;
+}
+
+async function runAI(){
+  if(!selectedEmail)return;
+  const btn=document.getElementById('aiActionBtn'),output=document.getElementById('aiOutput');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  output.className='ai-output loading';output.textContent='Thinking…';output.style.display='block';
+  document.getElementById('replyTextarea').style.display='none';
+  document.getElementById('logPanel').style.display='none';
+  document.getElementById('logBtn').style.display='none';
+
+  const ctx=`From: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\nDate: ${selectedEmail.rawDate||selectedEmail.date}\nBody:\n${selectedEmail.body}`;
+
+  const prompts={
+    summary:`You are a property management assistant for Double Six Lets Ltd.\n${PROP_CTX}\n\nAnalyse this email:\n**Summary:** 2-3 sentences\n**Property:** Which property (if any)\n**Action Required:** What needs to be done\n**Priority:** Low / Medium / High / Urgent\n\n${ctx}`,
+    reply:`You are a professional UK property letting agent for Double Six Lets Ltd.\n${PROP_CTX}\n\nDraft a concise professional reply. UK English. Sign off as "Jordan\nDouble Six Lets Ltd". No subject line.\n\n${ctx}`,
+    extract:`Extract financial data from this email for Double Six Lets Ltd, a UK property letting company.\n${PROP_CTX}\n\nReturn ONLY a JSON object:\n{\n  "type": "Expense" or "Income",\n  "description": "what this is in a few words",\n  "amount": number or null (total inc VAT),\n  "vat": number or null,\n  "net": number or null (ex VAT),\n  "property": "39 Esher Road"|"49 Greene Way"|"105 Ladywell"|"General",\n  "category": "Utility"|"Tenant"|"Supplier"|"Legal"|"Other",\n  "date": "DD/MM/YYYY",\n  "reference": "invoice/account ref or null"\n}\n\n${ctx}`
+  };
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompts[activeTab]}]})});
+    const data=await res.json();
+    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+
+    if(activeTab==='reply'){
+      output.style.display='none';
+      document.getElementById('replyTextarea').value=text;
+      document.getElementById('replyTextarea').style.display='block';
+      document.getElementById('copyBtn').style.display='inline-flex';
+    }else if(activeTab==='extract'){
+      const m=text.match(/\{[\s\S]*?\}/);
+      if(m){
+        try{
+          extractedData=JSON.parse(m[0]);
+          output.style.display='none';
+          buildLogPanel(extractedData);
+          document.getElementById('logBtn').style.display='inline-flex';
+        }catch{output.className='ai-output';output.textContent=text;}
+      }else{output.className='ai-output';output.textContent=text;}
+      document.getElementById('copyBtn').style.display='inline-flex';
+    }else{
+      output.className='ai-output';output.textContent=text;
+      document.getElementById('copyBtn').style.display='inline-flex';
+    }
+  }catch(err){output.className='ai-output';output.textContent='Error: '+err.message;}
+
+  btn.disabled=false;
+  const labs={summary:'Summarise',reply:'Draft Reply',extract:'Extract & Log'};
+  btn.textContent=labs[activeTab];
+}
+
+function buildLogPanel(d){
+  const cats=['Utility','Tenant','Supplier','Legal','Other'];
+  document.getElementById('logPanel').innerHTML=`
+    <div class="log-panel">
+      <div class="log-panel-title">📊 Review & Log to Sheets</div>
+      <div class="log-fields">
+        <div class="log-field"><label>Type</label><select class="log-input" id="ltype"><option ${d.type==='Expense'?'selected':''}>Expense</option><option ${d.type==='Income'?'selected':''}>Income</option></select></div>
+        <div class="log-field"><label>Category</label><select class="log-input" id="lcat">${cats.map(c=>`<option ${d.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div class="log-field full"><label>Description</label><input class="log-input" id="ldesc" value="${escA(d.description||'')}"></div>
+        <div class="log-field"><label>Amount £ (inc VAT)</label><input class="log-input" id="lamount" type="number" step="0.01" value="${d.amount||''}"></div>
+        <div class="log-field"><label>VAT £</label><input class="log-input" id="lvat" type="number" step="0.01" value="${d.vat||''}"></div>
+        <div class="log-field"><label>Net £ (ex VAT)</label><input class="log-input" id="lnet" type="number" step="0.01" value="${d.net||''}"></div>
+        <div class="log-field"><label>Property</label><select class="log-input" id="lprop">${PROP_LIST.map(p=>`<option ${d.property===p?'selected':''}>${p}</option>`).join('')}</select></div>
+        <div class="log-field"><label>Date</label><input class="log-input" id="ldate" value="${escA(d.date||'')}"></div>
+        ${d.reference?`<div class="log-field full"><label>Reference</label><input class="log-input" id="lref" value="${escA(d.reference)}"></div>`:'<input type="hidden" id="lref" value="">'}
+      </div>
+    </div>`;
+  document.getElementById('logPanel').style.display='block';
+}
+
+// ── Log to Sheets ─────────────────────────────────────────────────────────────
+async function logToSheets(){
+  if(!spreadsheetId){showToast('⚠️ No sheet — sign out and sign in again');return;}
+  const btn=document.getElementById('logBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Logging…';
+
+  try{
+    const v=id=>document.getElementById(id)?.value||'';
+    const type=v('ltype'),cat=v('lcat'),desc=v('ldesc'),amount=v('lamount'),vat=v('lvat'),net=v('lnet'),prop=v('lprop'),date=v('ldate'),ref=v('lref');
+    const loggedAt=new Date().toLocaleDateString('en-GB');
+    const row=[date,type,cat,desc+(ref?' ('+ref+')':''),amount,vat,net,prop,selectedEmail.from,selectedEmail.subject,'Logged',loggedAt];
+
+    const tabs=['All Transactions'];
+    if(prop&&prop!=='General')tabs.push(prop);
+
+    for(const tab of tabs){
+      await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent("'"+tab+"'!A:A")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,'POST',{values:[row]});
+    }
+
+    // Save locally
+    transactions.push({emailId:selectedEmail.id,date,type,category:cat,desc,amount:parseFloat(amount)||0,vat:parseFloat(vat)||0,net:parseFloat(net)||0,property:prop,from:selectedEmail.from,subject:selectedEmail.subject,loggedAt});
+    localStorage.setItem('dsl_tx',JSON.stringify(transactions));
+
+    selectedEmail.logged=true;
+    const em=allEmails.find(e=>e.id===selectedEmail.id);if(em)em.logged=true;
+    renderEmails();updateLogStats();
+    showToast('✅ Logged to Google Sheets!');
+    document.getElementById('logBtn').style.display='none';
+  }catch(err){
+    console.error(err);
+    showToast('❌ Failed: '+err.message);
+  }
+  btn.disabled=false;btn.textContent='📊 Log to Sheets';
+}
+
+// ── Excel export ───────────────────────────────────────────────────────────────
+function exportExcel(){
+  if(!transactions.length){showToast('No transactions logged yet');return;}
+  const wb=XLSX.utils.book_new();
+  const propTabs=['All Transactions','39 Esher Road','49 Greene Way','105 Ladywell'];
+  propTabs.forEach(tab=>{
+    const rows=tab==='All Transactions'?transactions:transactions.filter(t=>t.property===tab);
+    const data=[SHEET_HEADERS,...rows.map(t=>[t.date,t.type,t.category,t.desc,t.amount||'',t.vat||'',t.net||'',t.property,t.from,t.subject,'Logged',t.loggedAt])];
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[10,10,12,35,13,10,10,18,30,40,10,14].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb,ws,tab.substring(0,31));
+  });
+  XLSX.writeFile(wb,'Double_Six_Lets_Finance_'+new Date().toLocaleDateString('en-GB').replace(/\//g,'-')+'.xlsx');
+  showToast('📥 Excel downloaded');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function copyOutput(){
+  const text=activeTab==='reply'?document.getElementById('replyTextarea').value:document.getElementById('aiOutput').textContent;
+  navigator.clipboard.writeText(text).then(()=>showToast('📋 Copied'));
+}
+
+async function gapi(url,method,body){
+  const res=await fetch(url,{method,headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'HTTP '+res.status);}
+  return res.json().catch(()=>({}));
+}
+
+function escHtml(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escA(s){if(!s)return'';return s.replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function showToast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3500);}
+</script>
+</body>
+</html>
