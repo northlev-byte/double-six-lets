@@ -221,7 +221,7 @@ function getDateRange(){
     case'month':from=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];break;
     case'3months':const d3=new Date(now);d3.setMonth(d3.getMonth()-3);from=d3.toISOString().split('T')[0];break;
     case'12months':const d12=new Date(now);d12.setFullYear(d12.getFullYear()-1);from=d12.toISOString().split('T')[0];break;
-    default:const yr=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;from=`${yr}-04-06`;break;
+    default:{const m=now.getMonth(),d=now.getDate();const yr=(m>3||(m===3&&d>=6))?now.getFullYear():now.getFullYear()-1;from=`${yr}-04-06`;}break;
   }
   return{from,to};
 }
