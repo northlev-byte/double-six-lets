@@ -331,13 +331,101 @@ function renderCharts(){
 const EXPENSE_CATEGORIES=[
   'Mortgage / Finance','Insurance','Repairs & Maintenance','Letting Agent Fees',
   'Accountancy','Legal / Professional','Utilities','Ground Rent / Service Charge',
-  'Furnishings','Travel','Software / Tech','Rent Income','General / Other'
+  'Furnishings','Travel','Software / Tech',
+  'Director Expenses \u2014 Jordan Walker','Director Expenses \u2014 Keisha Walker',
+  'Director Loan \u2014 Jordan Walker','Director Loan \u2014 Keisha Walker',
+  'Intercompany / Dividends',
+  'Rent Income','General / Other'
 ];
 const PROPERTY_OPTIONS=['39 Esher Road','49 Greene Way','105 Ladywell','Unassigned'];
+
+// -- Logged transaction lookup for attachments --
+let loggedTxMap={};
+function buildLoggedTxMap(){
+  try{
+    const stored=JSON.parse(localStorage.getItem('dsl_tx')||'[]');
+    loggedTxMap={};
+    stored.forEach(t=>{
+      if(!t.emailId)return;
+      // Key by amount + date for matching to bank transactions
+      const key=`${Math.abs(parseFloat(t.amount||0)).toFixed(2)}_${t.date||''}`;
+      if(!loggedTxMap[key])loggedTxMap[key]=[];
+      loggedTxMap[key].push(t);
+    });
+  }catch(e){loggedTxMap={};}
+}
+
+function findLoggedTx(bankTx){
+  const key=`${Math.abs(bankTx.amount).toFixed(2)}_${bankTx.date||''}`;
+  const matches=loggedTxMap[key]||[];
+  if(matches.length===1)return matches[0];
+  // Try fuzzy description match
+  const desc=(bankTx.description||'').toLowerCase();
+  return matches.find(m=>{
+    const mDesc=(m.from||'').toLowerCase()+' '+(m.desc||'').toLowerCase();
+    return desc.split('//').some(part=>part.trim()&&mDesc.includes(part.trim().toLowerCase()));
+  })||matches[0]||null;
+}
+
+// Attachment cache to avoid re-fetching
+const attachmentCache={};
+
+async function loadAttachments(emailId,btnEl){
+  if(!emailId){showToast('No linked email found');return;}
+  // Toggle off if already showing
+  const existing=btnEl.parentElement.querySelector('.att-dropdown');
+  if(existing){existing.remove();return;}
+  // Close any other open dropdowns
+  document.querySelectorAll('.att-dropdown').forEach(d=>d.remove());
+
+  if(attachmentCache[emailId]){
+    showAttachmentDropdown(emailId,attachmentCache[emailId],btnEl);
+    return;
+  }
+
+  btnEl.innerHTML='<span class="spinner" style="width:12px;height:12px"></span>';
+  try{
+    const res=await fetch(`/api/gmail-message?id=${emailId}`);
+    const data=await res.json();
+    const atts=data.attachments||[];
+    attachmentCache[emailId]=atts;
+    showAttachmentDropdown(emailId,atts,btnEl);
+  }catch(e){
+    showToast('Failed to load attachments');
+  }
+  btnEl.textContent='\uD83D\uDCCE';
+}
+
+function showAttachmentDropdown(emailId,atts,btnEl){
+  const dd=document.createElement('div');
+  dd.className='att-dropdown';
+  dd.style.cssText='position:absolute;right:0;top:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);padding:8px;z-index:50;min-width:200px;max-width:300px;';
+  if(!atts.length){
+    dd.innerHTML='<div style="font-size:12px;color:var(--text-dim);padding:4px;">No attachments found</div>';
+  }else{
+    dd.innerHTML=atts.map(a=>{
+      const icon=a.mimeType?.includes('pdf')?'\uD83D\uDCC4':a.mimeType?.includes('image')?'\uD83D\uDDBC\uFE0F':'\uD83D\uDCCE';
+      const size=a.size>1024?`${(a.size/1024).toFixed(0)}KB`:`${a.size}B`;
+      return`<a href="/api/gmail-attachment?messageId=${emailId}&attachmentId=${a.attachmentId}&filename=${encodeURIComponent(a.filename)}" target="_blank" style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:4px;font-size:12px;color:var(--text);text-decoration:none;transition:background .1s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+        <span>${icon}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(a.filename)}</span>
+        <span style="color:var(--text-dim);font-size:10px;flex-shrink:0">${size}</span>
+      </a>`;
+    }).join('');
+  }
+  btnEl.parentElement.style.position='relative';
+  btnEl.parentElement.appendChild(dd);
+  // Close on outside click
+  setTimeout(()=>{
+    const closer=e=>{if(!dd.contains(e.target)&&e.target!==btnEl){dd.remove();document.removeEventListener('click',closer);}};
+    document.addEventListener('click',closer);
+  },10);
+}
 
 // -- Transactions Table --
 function renderTransactions(){
   if(!summaryData)return;
+  buildLoggedTxMap();
   let txs=[];
   const bp=summaryData.byProperty||{};
   if(activeProperty==='all'){
@@ -352,13 +440,15 @@ function renderTransactions(){
   if(!txs.length){wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-dim)">No transactions found for this period.</div>';return;}
 
   wrap.innerHTML=`<table class="data-table">
-    <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Property</th><th>Amount</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Property</th><th>Amount</th><th>Docs</th><th></th></tr></thead>
     <tbody>${txs.slice(0,100).map(t=>{
       const cat=t.assignedCategory||t.suggestedCategory||'General / Other';
       const isSuggested=!t.assignedCategory&&t.suggestedCategory;
+      const logged=findLoggedTx(t);
+      const emailId=logged?.emailId||'';
       return`<tr>
       <td>${esc(t.date||'')}</td>
-      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.description||'')}">${esc(t.description||'')}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.description||'')}">${esc(t.description||'')}</td>
       <td><select data-txid="${esc(t.id)}" onchange="assignCategory(this)" style="font-size:11px;padding:2px 4px;border:1px solid ${isSuggested?'var(--amber)':'var(--border)'};border-radius:4px;background:${isSuggested?'rgba(217,119,6,.06)':'var(--surface)'};color:var(--text);max-width:150px;">
         ${EXPENSE_CATEGORIES.map(c=>`<option ${cat===c?'selected':''}>${c}</option>`).join('')}
       </select>${isSuggested?'<span title="Auto-suggested" style="font-size:10px;color:var(--amber);margin-left:3px;">*</span>':''}</td>
@@ -366,11 +456,14 @@ function renderTransactions(){
         ${PROPERTY_OPTIONS.map(p=>`<option ${t.property===p?'selected':''}>${p}</option>`).join('')}
       </select></td>
       <td class="amount ${t.amount>=0?'positive':'negative'}" style="white-space:nowrap">${t.amount>=0?'+':''}\u00a3${Math.abs(t.amount).toFixed(2)}</td>
-      <td><button onclick="syncToFreeAgent('${esc(t.id)}')" title="Sync to FreeAgent" style="border:none;background:none;cursor:pointer;font-size:13px;opacity:.5;transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.5">${t.synced?'\u2705':'\u2B06\uFE0F'}</button></td>
+      <td style="text-align:center">${emailId
+        ?`<button onclick="loadAttachments('${emailId}',this)" title="View attachments from email" style="border:none;background:none;cursor:pointer;font-size:14px;opacity:.7;transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7">\uD83D\uDCCE</button>`
+        :`<span style="color:var(--text-dim);font-size:11px" title="No linked email">\u2014</span>`}</td>
+      <td><button onclick="syncToFreeAgent('${esc(t.id)}')" title="${t.explained||t.synced?'Already synced \u2014 click to update category in FreeAgent':'Sync category to FreeAgent'}" style="border:none;background:none;cursor:pointer;font-size:13px;opacity:${t.explained||t.synced?'1':'.5'};transition:opacity .15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=${t.explained||t.synced?'1':'.5'}">${t.explained||t.synced?'\u2705':'\u2B06\uFE0F'}</button></td>
     </tr>`;}).join('')}
-    ${txs.length>100?`<tr><td colspan="6" style="text-align:center;color:var(--text-dim)">Showing first 100 of ${txs.length}</td></tr>`:''}
+    ${txs.length>100?`<tr><td colspan="7" style="text-align:center;color:var(--text-dim)">Showing first 100 of ${txs.length}</td></tr>`:''}
     </tbody></table>
-    <div style="margin-top:8px;font-size:11px;color:var(--text-dim)"><span style="color:var(--amber)">*</span> Auto-suggested category based on transaction description. Click the dropdown to change. Use the \u2B06\uFE0F button to sync changes to FreeAgent.</div>`;
+    <div style="margin-top:8px;font-size:11px;color:var(--text-dim)"><span style="color:var(--amber)">*</span> Auto-suggested category. \uD83D\uDCCE = email attachment linked from inbox. \u2B06\uFE0F = sync to FreeAgent.</div>`;
 }
 
 function findTx(txId){
@@ -437,7 +530,8 @@ async function syncToFreeAgent(txId){
     const data=await res.json();
     if(data.ok){
       tx.synced=true;
-      showToast('Synced to FreeAgent as "'+cat+'"');
+      tx.explained=true;
+      showToast((data.replaced?'Updated':'Synced')+' in FreeAgent as "'+cat+'"');
       renderTransactions();
     }else{
       showToast('Sync failed: '+(data.error||'Unknown error'));
@@ -573,8 +667,11 @@ function exportCSV(){
   if(activeProperty!=='all')txs=txs.filter(t=>t.property===activeProperty);
   txs.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
-  let csv='Date,Description,Category,Property,Amount\n';
-  txs.forEach(t=>{csv+=`"${t.date}","${(t.description||'').replace(/"/g,'""')}","${t.assignedCategory||t.suggestedCategory||''}","${t.property}",${t.amount}\n`;});
+  let csv='Date,Description,Category,Property,Amount,EmailId\n';
+  txs.forEach(t=>{
+    const logged=findLoggedTx(t);
+    csv+=`"${t.date}","${(t.description||'').replace(/"/g,'""')}","${t.assignedCategory||t.suggestedCategory||''}","${t.property}",${t.amount},"${logged?.emailId||''}"\n`;
+  });
 
   const blob=new Blob([csv],{type:'text/csv'});
   const a=document.createElement('a');

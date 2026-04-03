@@ -189,6 +189,21 @@ async function handleExplainTransaction(body, res) {
     const faCat = (catData.categories || []).find(c => c.nominal_code === expCat.faCode);
     if (!faCat) return res.status(400).json({ error: `FreeAgent category not found for code ${expCat.faCode}` });
 
+    // Check if already explained (unexplained_amount === 0 means fully explained)
+    const unexplained = parseFloat(tx.unexplained_amount || tx.amount);
+    if (Math.abs(unexplained) < 0.01) {
+      // Already explained — find and delete existing explanation, then re-create
+      try {
+        const existingExps = await freeAgentApi(`/v2/bank_transaction_explanations?bank_transaction=${encodeURIComponent(transactionId)}`);
+        const exps = existingExps.bank_transaction_explanations || [];
+        for (const exp of exps) {
+          await freeAgentApi(exp.url, 'DELETE');
+        }
+      } catch (delErr) {
+        // If we can't delete, still try to create — FreeAgent may reject if truly duplicate
+      }
+    }
+
     // Create bank transaction explanation
     const data = await freeAgentApi('/v2/bank_transaction_explanations', 'POST', {
       bank_transaction_explanation: {
@@ -196,11 +211,11 @@ async function handleExplainTransaction(body, res) {
         category: faCat.url,
         dated_on: tx.dated_on,
         description: description || tx.description || '',
-        gross_value: String(tx.amount),
+        gross_value: String(unexplained !== 0 ? unexplained : tx.amount),
       },
     });
 
-    return res.status(200).json({ ok: true, explanation: data.bank_transaction_explanation });
+    return res.status(200).json({ ok: true, explanation: data.bank_transaction_explanation, replaced: Math.abs(unexplained) < 0.01 });
   } catch (err) {
     return res.status(500).json({ error: `Failed to explain transaction: ${err.message}` });
   }
@@ -243,6 +258,11 @@ const EXPENSE_CATEGORIES = [
   { name: 'Furnishings', faCode: '285', keywords: ['furniture', 'furnish', 'carpet', 'curtain', 'blind', 'appliance', 'ikea', 'argos', 'amazon', 'john lewis', 'currys', 'ao.com'] },
   { name: 'Travel', faCode: '294', keywords: ['travel', 'mileage', 'petrol', 'fuel', 'parking', 'train', 'rail'] },
   { name: 'Software / Tech', faCode: '298', keywords: ['software', 'subscription', 'saas', 'google', 'microsoft', 'xero', 'freeagent', 'slack', 'zoom', 'domain', 'hosting', 'vercel', 'cloud'] },
+  { name: 'Director Expenses — Jordan Walker', faCode: '270', keywords: ['jordan walker expenses', 'jw expenses'] },
+  { name: 'Director Expenses — Keisha Walker', faCode: '270', keywords: ['keisha walker expenses', 'kw expenses'] },
+  { name: 'Director Loan — Jordan Walker', faCode: '270', keywords: ['jordan walker'] },
+  { name: 'Director Loan — Keisha Walker', faCode: '270', keywords: ['keisha walker'] },
+  { name: 'Intercompany / Dividends', faCode: '270', keywords: ['double six holdings', 'dsh', 'holdings limited', 'holdings ltd', 'dividend', 'intercompany'] },
   { name: 'Rent Income', faCode: '001', keywords: ['rent', 'tenant', 'rental income', 'standing order'] },
   { name: 'General / Other', faCode: '298', keywords: [] },
 ];
@@ -293,10 +313,12 @@ async function handleTransactions(req, res) {
   const transactions = allTx.map(t => {
     const amt = parseFloat(t.amount || 0);
     const desc = `${t.description || ''} ${t.full_description || ''}`;
+    const unexplained = parseFloat(t.unexplained_amount || t.amount);
     return {
       id: t.url, date: t.dated_on, amount: amt,
       description: t.description || '', category: t.category || '',
-      bankAccount: t.bank_account || '', explained: !!t.category,
+      bankAccount: t.bank_account || '',
+      explained: Math.abs(unexplained) < 0.01,
       property: matchProperty(desc),
       suggestedCategory: suggestCategory(desc, amt),
     };
@@ -431,9 +453,11 @@ async function handleTransactionsRaw(from, to) {
   return allTx.map(t => {
     const amt = parseFloat(t.amount || 0);
     const desc = `${t.description || ''} ${t.full_description || ''}`;
+    const unexplained = parseFloat(t.unexplained_amount || t.amount);
     return {
       id: t.url, date: t.dated_on, amount: amt,
       description: t.description || '', category: t.category || '',
+      explained: Math.abs(unexplained) < 0.01,
       property: matchProperty(desc),
       suggestedCategory: suggestCategory(desc, amt),
     };
