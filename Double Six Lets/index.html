@@ -226,6 +226,18 @@
   .btn-send{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(249,115,22,.25);}
   .btn-send:hover{background:var(--accent-dim);}
 
+  /* FreeAgent section */
+  .fa-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);margin-bottom:8px;}
+  .fa-status.connected{color:#10b981;}
+  .fa-status .fa-dot{width:6px;height:6px;border-radius:50%;background:var(--text-dim);}
+  .fa-status.connected .fa-dot{background:#10b981;box-shadow:0 0 6px rgba(16,185,129,.4);}
+  .fa-stat-row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border);}
+  .fa-stat-row:last-child{border-bottom:none;}
+  .fa-stat-label{color:var(--text-muted);}
+  .fa-stat-val{color:var(--text);font-weight:600;}
+  .btn-freeagent{background:rgba(0,133,106,.08);color:#00856a;border:1px solid rgba(0,133,106,.2);}
+  .btn-freeagent:hover{background:rgba(0,133,106,.14);}
+
   /* Dashboard charts */
   .chart-section{margin-top:8px;}
   .chart-bar-wrap{margin-bottom:6px;}
@@ -371,6 +383,17 @@
           <div class="chart-donut-wrap" id="catChart"></div>
         </div>
       </div>
+      <div class="sidebar-section" id="freeagentSection">
+        <button class="sidebar-collapse-btn" onclick="toggleCollapse('freeagent')">
+          <div class="sidebar-label">FreeAgent</div>
+          <span class="collapse-icon" id="collapse-icon-freeagent">&#9662;</span>
+        </button>
+        <div class="sidebar-collapsible" id="collapse-freeagent">
+          <div id="freeagentPanel">
+            <div class="fa-status" id="faStatus"><span class="fa-dot"></span>Checking...</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="email-list">
@@ -423,6 +446,7 @@
             <button class="btn btn-primary" id="aiActionBtn" onclick="runAI()">Summarise</button>
             <button class="btn btn-ghost" id="copyBtn" onclick="copyOutput()" style="display:none">Copy</button>
             <button class="btn btn-green" id="logBtn" onclick="logToSheets()" style="display:none">Log to Sheets</button>
+            <button class="btn btn-freeagent" id="faLogBtn" onclick="pushToFreeAgent()" style="display:none">Push to FreeAgent</button>
           </div>
         </div>
         <div class="detail-body-wrap" id="detailBodyWrap"></div>
@@ -460,6 +484,7 @@ window.addEventListener('load',async()=>{
   updateLogStats();
   if(spreadsheetId)updateSheetPill();
   loadLabels();
+  loadFreeAgent();
   await ensureSheet();
   await fetchEmails();
 });
@@ -979,7 +1004,8 @@ function switchTab(tab){
     actions.innerHTML=`
       <button class="btn btn-primary" id="aiActionBtn" onclick="runAI()">${labs[tab]||'Analyse'}</button>
       <button class="btn btn-ghost" id="copyBtn" onclick="copyOutput()" style="display:none">Copy</button>
-      <button class="btn btn-green" id="logBtn" onclick="logToSheets()" style="display:none">Log to Sheets</button>`;
+      <button class="btn btn-green" id="logBtn" onclick="logToSheets()" style="display:none">Log to Sheets</button>
+            <button class="btn btn-freeagent" id="faLogBtn" onclick="pushToFreeAgent()" style="display:none">Push to FreeAgent</button>`;
   }
 }
 
@@ -1038,6 +1064,7 @@ async function runAI(){
           output.style.display='none';
           buildLogPanel(extractedData);
           document.getElementById('logBtn').style.display='inline-flex';
+          if(faConnected)document.getElementById('faLogBtn').style.display='inline-flex';
         }catch{output.className='ai-output';output.textContent=text;}
       }else{output.className='ai-output';output.textContent=text;}
       document.getElementById('copyBtn').style.display='inline-flex';
@@ -1125,6 +1152,140 @@ function exportExcel(){
 function copyOutput(){
   const text=activeTab==='reply'?(document.getElementById('composeBody')?.value||document.getElementById('replyTextarea')?.value||''):document.getElementById('aiOutput')?.textContent||'';
   navigator.clipboard.writeText(text).then(()=>showToast('Copied to clipboard'));
+}
+
+// -- FreeAgent --
+let faCategories=JSON.parse(localStorage.getItem('dsl_fa_cats')||'[]');
+let faContacts=JSON.parse(localStorage.getItem('dsl_fa_contacts')||'[]');
+let faConnected=false;
+
+async function loadFreeAgent(){
+  try{
+    const res=await fetch('/api/freeagent-sync');
+    const data=await res.json();
+    const panel=document.getElementById('freeagentPanel');
+    const status=document.getElementById('faStatus');
+
+    if(!data.configured){
+      status.className='fa-status';
+      status.innerHTML='<span class="fa-dot"></span>Not configured';
+      panel.innerHTML=`<div class="fa-status"><span class="fa-dot"></span>Not configured</div>
+        <a href="/api/freeagent-auth" target="_blank" class="btn btn-ghost" style="margin-top:6px;font-size:12px;width:100%;justify-content:center">Setup FreeAgent</a>`;
+      return;
+    }
+    if(!data.connected){
+      status.className='fa-status';
+      status.innerHTML='<span class="fa-dot"></span>Disconnected';
+      panel.innerHTML=`<div class="fa-status"><span class="fa-dot"></span>Disconnected</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">${escHtml(data.error||'')}</div>
+        <a href="/api/freeagent-auth" target="_blank" class="btn btn-ghost" style="font-size:12px;width:100%;justify-content:center">Reconnect</a>`;
+      return;
+    }
+
+    faConnected=true;
+    const s=data.stats||{};
+    status.className='fa-status connected';
+    status.innerHTML=`<span class="fa-dot"></span>${escHtml(data.company)}`;
+
+    let html=`<div class="fa-status connected"><span class="fa-dot"></span>${escHtml(data.company)}</div>`;
+    html+=`<div class="fa-stat-row"><span class="fa-stat-label">Expenses (30d)</span><span class="fa-stat-val">${s.expenses30d||0} / \u00a3${(s.expenses30dTotal||0).toFixed(0)}</span></div>`;
+    html+=`<div class="fa-stat-row"><span class="fa-stat-label">Open bills</span><span class="fa-stat-val">${s.openBills||0} / \u00a3${(s.openBillsTotal||0).toFixed(0)}</span></div>`;
+    html+=`<div class="fa-stat-row"><span class="fa-stat-label">Contacts</span><span class="fa-stat-val">${s.contactCount||0}</span></div>`;
+    html+=`<button class="btn btn-ghost" onclick="loadFreeAgent()" style="margin-top:6px;font-size:11px;width:100%;justify-content:center">Refresh</button>`;
+    panel.innerHTML=html;
+
+    // Cache contacts
+    if(data.contacts?.length){
+      faContacts=data.contacts;
+      localStorage.setItem('dsl_fa_contacts',JSON.stringify(faContacts));
+    }
+  }catch(e){console.warn('FreeAgent load failed:',e);}
+}
+
+async function loadFACategories(){
+  if(faCategories.length)return faCategories;
+  try{
+    const res=await fetch('/api/freeagent?action=categories');
+    const data=await res.json();
+    if(data.categories){
+      faCategories=data.categories;
+      localStorage.setItem('dsl_fa_cats',JSON.stringify(faCategories));
+    }
+  }catch(e){console.warn('FA categories failed:',e);}
+  return faCategories;
+}
+
+function mapCategoryToFA(dslCategory){
+  // Map DSL categories to common FreeAgent nominal code ranges
+  const mapping={
+    'Utility':{keywords:['utilities','gas','electric','water','energy'],fallbackCode:'291'},
+    'Supplier':{keywords:['repairs','maintenance','property','building'],fallbackCode:'285'},
+    'Legal':{keywords:['legal','professional','solicitor','accountancy'],fallbackCode:'270'},
+    'Tenant':{keywords:['rent','income','tenant'],fallbackCode:'001'},
+    'Other':{keywords:['general','sundry','miscellaneous'],fallbackCode:'298'},
+  };
+  const map=mapping[dslCategory]||mapping['Other'];
+  // Try to find matching FA category
+  const match=faCategories.find(c=>map.keywords.some(k=>c.description.toLowerCase().includes(k)));
+  return match?.url||faCategories.find(c=>c.nominalCode===map.fallbackCode)?.url||null;
+}
+
+function findContactByEmail(email){
+  if(!email||!faContacts.length)return null;
+  const addr=email.match(/<([^>]+)>/)?.[1]||email;
+  return faContacts.find(c=>c.email&&c.email.toLowerCase()===addr.toLowerCase());
+}
+
+async function pushToFreeAgent(){
+  if(!faConnected){showToast('FreeAgent not connected');return;}
+  const btn=document.getElementById('faLogBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Pushing...';
+
+  try{
+    await loadFACategories();
+    const v=id=>document.getElementById(id)?.value||'';
+    const type=v('ltype'),cat=v('lcat'),desc=v('ldesc'),amount=v('lamount'),prop=v('lprop'),date=v('ldate'),ref=v('lref');
+
+    // Format date to YYYY-MM-DD
+    const dateParts=(date||'').split('/');
+    const isoDate=dateParts.length===3?`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`:new Date().toISOString().split('T')[0];
+
+    const faCat=mapCategoryToFA(cat);
+    const contact=findContactByEmail(selectedEmail?.from);
+
+    if(type==='Expense'){
+      // Try to create as bill if we have a contact, otherwise as expense
+      if(contact){
+        const res=await fetch('/api/freeagent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+          action:'create-bill',contact:contact.url,reference:ref||desc,date:isoDate,dueDate:isoDate,
+          description:desc,items:[{category:faCat,amount:parseFloat(amount)||0,description:desc}]
+        })});
+        if(!res.ok){const e=await res.json();throw new Error(e.error||'Failed');}
+        showToast('Bill created in FreeAgent!');
+      }else{
+        const res=await fetch('/api/freeagent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+          action:'create-expense',category:faCat,amount:parseFloat(amount)||0,date:isoDate,description:desc
+        })});
+        if(!res.ok){const e=await res.json();throw new Error(e.error||'Failed');}
+        showToast('Expense created in FreeAgent!');
+      }
+    }else{
+      // Income - create invoice
+      if(contact){
+        const res=await fetch('/api/freeagent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+          action:'create-invoice',contact:contact.url,date:isoDate,dueDate:isoDate,paymentTerms:30,
+          items:[{description:desc||'Rent',price:parseFloat(amount)||0,quantity:1}]
+        })});
+        if(!res.ok){const e=await res.json();throw new Error(e.error||'Failed');}
+        showToast('Invoice created in FreeAgent!');
+      }else{
+        showToast('No matching contact in FreeAgent for this sender');
+      }
+    }
+
+    loadFreeAgent(); // Refresh stats
+  }catch(e){showToast('FreeAgent: '+e.message);}
+  btn.disabled=false;btn.textContent='Push to FreeAgent';
 }
 
 // -- Dashboard charts --
