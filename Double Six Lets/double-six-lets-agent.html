@@ -6,7 +6,7 @@
 <title>Double Six Lets — Property Agent</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23f97316'/><text x='16' y='22' text-anchor='middle' font-family='serif' font-size='14' font-weight='700' fill='%23fff'>66</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 <style>
@@ -209,11 +209,10 @@
       <div><div class="brand-name">Double Six Lets</div><div class="brand-sub">Property Agent</div></div>
     </div>
     <div class="header-right">
-      <div class="status-pill" id="gmailStatus"><div class="dot"></div><span id="gmailStatusText">Not signed in</span></div>
+      <div class="status-pill connected" id="gmailStatus"><div class="dot"></div><span id="gmailStatusText">double6lets@gmail.com</span></div>
       <div class="sheets-pill" id="sheetsPill" onclick="openSheet()" title="Click to open spreadsheet"><span id="sheetsPillText">No sheet yet</span></div>
-      <button class="btn btn-ghost" id="signInBtn" onclick="signIn()">Sign in with Google</button>
-      <button class="btn btn-ghost" onclick="exportExcel()" id="exportBtn" style="display:none">Excel</button>
-      <button class="btn btn-primary" id="fetchBtn" onclick="fetchEmails()" style="display:none">Refresh</button>
+      <button class="btn btn-ghost" onclick="exportExcel()" id="exportBtn">Excel</button>
+      <button class="btn btn-primary" id="fetchBtn" onclick="fetchEmails()">Refresh</button>
     </div>
   </header>
 
@@ -276,12 +275,10 @@
       </div>
       <div class="search-bar"><input class="search-input" id="searchInput" placeholder="Search emails..." oninput="renderEmails()"></div>
       <div class="email-list-body" id="emailListBody">
-        <div class="connect-prompt">
-          <div class="connect-icon">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="6" y="12" width="36" height="24" rx="3" stroke="var(--accent)" stroke-width="2" fill="none" opacity=".4"/><path d="M6 15l18 12 18-12" stroke="var(--accent)" stroke-width="2" fill="none" opacity=".4"/></svg>
-          </div>
-          <div class="connect-title">Ready</div>
-          <div class="connect-desc">Sign in with Google to load your inbox and connect your finance sheet.</div>
+        <div class="connect-prompt" id="connectPrompt">
+          <div class="connect-icon"><span class="spinner" style="width:22px;height:22px"></span></div>
+          <div class="connect-title">Loading emails...</div>
+          <div class="connect-desc">Fetching your inbox from Gmail.</div>
         </div>
       </div>
     </div>
@@ -331,8 +328,6 @@
 </button>
 
 <script>
-const CLIENT_ID = '612945003927-i59mnukbl933vc6c2s6hs351s6ud3v99.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
 const PROXY_URL = 'https://dsl-proxy.vercel.app/api/proxy';
 const SHEET_HEADERS = ['Date','Type','Category','Description','Amount (\u00a3)','VAT (\u00a3)','Net (\u00a3)','Property','From','Subject','Status','Logged At'];
 const SHEET_TABS = ['All Transactions','39 Esher Road','49 Greene Way','105 Ladywell'];
@@ -344,32 +339,17 @@ const PROP_CTX = 'Properties managed by Double Six Lets Ltd:\n- 39 Esher Road, L
 
 let allEmails=[],filteredEmails=[],selectedEmail=null;
 let activeFilter='all',activeProp=null,activeTab='summary';
-let isLoading=false,accessToken=null,tokenClient=null;
+let isLoading=false;
 let spreadsheetId=localStorage.getItem('dsl_sheet_id')||null;
 let transactions=JSON.parse(localStorage.getItem('dsl_tx')||'[]');
 let extractedData=null;
 
-// -- Auth --
-window.addEventListener('load',()=>{
-  const tryInit=()=>{
-    if(typeof google==='undefined'){setTimeout(tryInit,200);return;}
-    google.accounts.id.initialize({client_id:CLIENT_ID});
-    tokenClient=google.accounts.oauth2.initTokenClient({
-      client_id:CLIENT_ID,scope:SCOPES,
-      callback:async(resp)=>{
-        if(resp.error){showToast('Auth error: '+resp.error);return;}
-        accessToken=resp.access_token;
-        sessionStorage.setItem('dsl_token',accessToken);
-        setSignedIn();
-        await ensureSheet();
-        await fetchEmails();
-      }
-    });
-    const stored=sessionStorage.getItem('dsl_token');
-    if(stored){accessToken=stored;setSignedIn();if(spreadsheetId)updateSheetPill();}
-    updateLogStats();
-  };
-  tryInit();
+// -- Init --
+window.addEventListener('load',async()=>{
+  updateLogStats();
+  if(spreadsheetId)updateSheetPill();
+  await ensureSheet();
+  await fetchEmails();
 });
 
 // -- Keyboard navigation --
@@ -398,16 +378,6 @@ function scrollEmailIntoView(idx){
   if(items[idx])items[idx].scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 
-function signIn(){if(!tokenClient){showToast('Loading...');return;}tokenClient.requestAccessToken({prompt:'select_account'});}
-
-function setSignedIn(){
-  document.getElementById('gmailStatus').classList.add('connected');
-  document.getElementById('gmailStatusText').textContent='double6lets@gmail.com';
-  document.getElementById('signInBtn').style.display='none';
-  document.getElementById('fetchBtn').style.display='inline-flex';
-  document.getElementById('exportBtn').style.display='inline-flex';
-}
-
 function updateSheetPill(){
   document.getElementById('sheetsPill').classList.add('linked');
   document.getElementById('sheetsPillText').textContent='Sheet Linked';
@@ -419,40 +389,23 @@ function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('open');
 }
 
-// -- Spreadsheet creation --
+// -- Spreadsheet --
 async function ensureSheet(){
   if(spreadsheetId){updateSheetPill();return;}
   showToast('Creating finance spreadsheet...');
   try{
-    const res=await gapi('https://sheets.googleapis.com/v4/spreadsheets','POST',{
-      properties:{title:'Double Six Lets \u2014 Finance Tracker'},
-      sheets:SHEET_TABS.map((t,i)=>({properties:{sheetId:i,title:t,index:i}}))
-    });
-    spreadsheetId=res.spreadsheetId;
+    const res=await fetch('/api/sheets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ensure'})});
+    if(!res.ok)throw new Error('Sheet creation failed');
+    const data=await res.json();
+    spreadsheetId=data.spreadsheetId;
     localStorage.setItem('dsl_sheet_id',spreadsheetId);
-
-    for(const tab of SHEET_TABS){
-      await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent("'"+tab+"'!A1")}?valueInputOption=USER_ENTERED`,'PUT',{values:[SHEET_HEADERS]});
-    }
-
-    await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,'POST',{
-      requests:SHEET_TABS.map((_,i)=>({
-        repeatCell:{
-          range:{sheetId:i,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:SHEET_HEADERS.length},
-          cell:{userEnteredFormat:{backgroundColor:{red:.16,green:.16,blue:.16},textFormat:{bold:true,foregroundColor:{red:.78,green:.94,blue:.3}}}},
-          fields:'userEnteredFormat(backgroundColor,textFormat)'
-        }
-      }))
-    });
-
     updateSheetPill();
     showToast('Finance spreadsheet created!');
-  }catch(e){console.error(e);showToast('Sheet creation failed \u2014 check permissions');}
+  }catch(e){console.error(e);showToast('Sheet creation failed');}
 }
 
 // -- Gmail --
 async function fetchEmails(){
-  if(!accessToken){signIn();return;}
   if(isLoading)return;
   isLoading=true;
   const btn=document.getElementById('fetchBtn');
@@ -461,20 +414,12 @@ async function fetchEmails(){
   showSkeletonLoading();
 
   try{
-    const lr=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&labelIds=INBOX',{headers:{Authorization:'Bearer '+accessToken}});
-    if(lr.status===401){handleExpiry();return;}
-    const ld=await lr.json();
-    const ids=(ld.messages||[]).map(m=>m.id);
-    document.getElementById('listCount').textContent='0 / '+ids.length;
-    let emails=[];
-    // Fetch in parallel batches of 15 for speed
-    for(let i=0;i<ids.length;i+=15){
-      const batch=await Promise.all(ids.slice(i,i+15).map(id=>fetchMsg(id)));
-      emails=emails.concat(batch.filter(Boolean));
-      document.getElementById('listCount').textContent=emails.length+' / '+ids.length;
-    }
+    const res=await fetch('/api/gmail');
+    if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error||'Failed to fetch emails');}
+    const data=await res.json();
+    document.getElementById('listCount').textContent=data.emails.length+' emails';
     showSkeletonLoading('Categorising with AI...');
-    allEmails=await categorise(emails);
+    allEmails=await categorise(data.emails);
     transactions.forEach(t=>{const e=allEmails.find(x=>x.id===t.emailId);if(e)e.logged=true;});
     renderEmails();updateStats();updateLogStats();updatePropertyCounts();
     showToast(allEmails.length+' emails loaded');
@@ -500,41 +445,6 @@ function showSkeletonLoading(msg){
   body.innerHTML=msg?`<div style="padding:10px 13px;font-size:12px;color:var(--text-dim);text-align:center">${escHtml(msg)}</div>`+skeletons:skeletons;
 }
 
-function handleExpiry(){
-  accessToken=null;sessionStorage.removeItem('dsl_token');
-  document.getElementById('signInBtn').style.display='inline-flex';
-  document.getElementById('fetchBtn').style.display='none';
-  document.getElementById('gmailStatus').classList.remove('connected');
-  document.getElementById('gmailStatusText').textContent='Not signed in';
-  showToast('Session expired \u2014 sign in again');isLoading=false;
-}
-
-async function fetchMsg(id){
-  try{
-    const res=await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,{headers:{Authorization:'Bearer '+accessToken}});
-    const msg=await res.json();
-    const hdrs=msg.payload?.headers||[];
-    const get=n=>hdrs.find(h=>h.name.toLowerCase()===n.toLowerCase())?.value||'';
-    const subject=get('Subject')||'(no subject)';
-    const from=get('From');
-    const rawDate=get('Date');
-    const date=fmtDate(rawDate);
-    const unread=(msg.labelIds||[]).includes('UNREAD');
-    let bodyText='',bodyHtml='';
-    const extr=parts=>{for(const p of parts||[]){
-      if(p.mimeType==='text/plain'&&p.body?.data&&!bodyText)bodyText=b64d(p.body.data);
-      if(p.mimeType==='text/html'&&p.body?.data&&!bodyHtml)bodyHtml=b64d(p.body.data);
-      if(p.parts)extr(p.parts);
-    }};
-    if(msg.payload?.body?.data){const d=b64d(msg.payload.body.data);if(msg.payload.mimeType==='text/html')bodyHtml=d;else bodyText=d;}
-    extr(msg.payload?.parts);
-    const body=bodyText||bodyHtml.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-    return{id,subject,from,date,rawDate,preview:body.substring(0,90).trim(),body:body.substring(0,1000),bodyHtml:bodyHtml.substring(0,8000),unread,category:'Other',property:null,urgent:false,hasInvoice:false,logged:false};
-  }catch{return null;}
-}
-
-function b64d(d){try{return decodeURIComponent(escape(atob(d.replace(/-/g,'+').replace(/_/g,'/'))));}catch{return atob(d.replace(/-/g,'+').replace(/_/g,'/'));}}
-function fmtDate(r){try{const d=new Date(r),n=new Date();if(d.toDateString()===n.toDateString())return d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}catch{return '';}}
 
 // -- Proxy helper with retry --
 async function proxyCall(body, retries=2){
@@ -569,7 +479,7 @@ async function categorise(emails){
   for(let b=0;b<emails.length;b+=batchSize){
     const batch=emails.slice(b,b+batchSize);
     try{
-      const sums=batch.map((e,i)=>`${b+i}|FROM:${e.from}|SUBJ:${e.subject}|BODY:${e.body.substring(0,120)}`).join('\n');
+      const sums=batch.map((e,i)=>`${b+i}|FROM:${e.from}|SUBJ:${e.subject}|SNIPPET:${(e.preview||e.body||'').substring(0,120)}`).join('\n');
       const data=await proxyCall({
         model:'claude-sonnet-4-20250514',max_tokens:2000,
         messages:[{role:'user',content:`Double Six Lets Ltd \u2014 UK property letting company.\n${PROP_CTX}\n\nFor each email return JSON array:\n- index: number\n- category: "Tenant"|"Supplier"|"Utility"|"Legal"|"Other"\n- property: "39 Esher Road"|"49 Greene Way"|"105 Ladywell"|null\n- urgent: boolean\n- hasInvoice: boolean (true if bill/invoice/payment amount present)\n\nEmails:\n${sums}\n\nReturn ONLY valid JSON array.`}]
@@ -589,9 +499,9 @@ async function categorise(emails){
 function getFiltered(){
   let em=allEmails;
   if(activeFilter!=='all')em=em.filter(e=>e.category===activeFilter);
-  if(activeProp){const kws=PROP_KW[activeProp]||[];em=em.filter(e=>kws.some(k=>(e.subject+' '+e.body+' '+e.from+' '+(e.property||'')).toLowerCase().includes(k)));}
+  if(activeProp){const kws=PROP_KW[activeProp]||[];em=em.filter(e=>kws.some(k=>(e.subject+' '+(e.preview||e.body||'')+' '+e.from+' '+(e.property||'')).toLowerCase().includes(k)));}
   const q=document.getElementById('searchInput')?.value?.toLowerCase();
-  if(q)em=em.filter(e=>(e.subject+e.from+e.body).toLowerCase().includes(q));
+  if(q)em=em.filter(e=>(e.subject+e.from+(e.preview||e.body||'')).toLowerCase().includes(q));
   return em;
 }
 
@@ -683,7 +593,7 @@ function closeSidebarOnMobile(){
 }
 
 // -- Select email --
-function selectEmail(idx){
+async function selectEmail(idx){
   selectedEmail=filteredEmails[idx];
   document.getElementById('detailEmpty').style.display='none';
   document.getElementById('detailContent').style.display='flex';
@@ -692,10 +602,26 @@ function selectEmail(idx){
   document.getElementById('detailDate').textContent=selectedEmail.date;
 
   const bw=document.getElementById('detailBodyWrap');
+
+  // Lazy-load full body if not yet fetched
+  if(!selectedEmail.body&&!selectedEmail.bodyHtml){
+    bw.innerHTML='<div class="detail-body" style="text-align:center;padding:40px"><span class="spinner" style="width:20px;height:20px"></span></div>';
+    try{
+      const res=await fetch('/api/gmail-message?id='+encodeURIComponent(selectedEmail.id));
+      if(res.ok){
+        const msg=await res.json();
+        selectedEmail.body=msg.body||'';
+        selectedEmail.bodyHtml=msg.bodyHtml||'';
+        // Update the email in allEmails too for AI context
+        const em=allEmails.find(e=>e.id===selectedEmail.id);
+        if(em){em.body=msg.body||'';em.bodyHtml=msg.bodyHtml||'';}
+      }
+    }catch(e){console.warn('Failed to load email body:',e);}
+  }
+
   if(selectedEmail.bodyHtml){
     const div=document.createElement('div');
     div.className='detail-body detail-body-html';
-    // Sanitize HTML to prevent XSS
     div.innerHTML=DOMPurify.sanitize(selectedEmail.bodyHtml,{
       ALLOWED_TAGS:['p','br','div','span','a','b','strong','i','em','u','ul','ol','li','h1','h2','h3','h4','h5','h6','table','tr','td','th','thead','tbody','img','blockquote','pre','code','hr'],
       ALLOWED_ATTR:['href','src','alt','style','class','width','height','colspan','rowspan'],
@@ -703,14 +629,16 @@ function selectEmail(idx){
     });
     div.querySelectorAll('a').forEach(a=>{a.setAttribute('target','_blank');a.setAttribute('rel','noopener noreferrer');});
     bw.innerHTML='';bw.appendChild(div);
-  }else{
+  }else if(selectedEmail.body){
     bw.innerHTML=`<div class="detail-body">${escHtml(selectedEmail.body)}</div>`;
+  }else{
+    bw.innerHTML='<div class="detail-body" style="color:var(--text-dim)">No content available.</div>';
   }
 
   const cat=selectedEmail.category,col=CAT_COLORS[cat]||'var(--other)';
   document.getElementById('detailTags').innerHTML=`
-    <span class="tag" style="background:${col}22;color:${col}">${cat}</span>
-    ${selectedEmail.property?`<span class="tag" style="background:rgba(200,240,76,.1);color:var(--accent-dim);margin-left:4px">${escHtml(selectedEmail.property)}</span>`:''}
+    <span class="tag" style="background:${col}15;color:${col}">${cat}</span>
+    ${selectedEmail.property?`<span class="tag" style="background:rgba(249,115,22,.06);color:var(--accent);margin-left:4px">${escHtml(selectedEmail.property)}</span>`:''}
     ${selectedEmail.urgent?'<span class="tag urgent-tag" style="margin-left:4px">Urgent</span>':''}
     ${selectedEmail.logged?'<span class="tag logged-tag" style="margin-left:4px">Logged</span>':''}
   `;
@@ -815,7 +743,7 @@ function buildLogPanel(d){
 
 // -- Log to Sheets --
 async function logToSheets(){
-  if(!spreadsheetId){showToast('No sheet \u2014 sign out and sign in again');return;}
+  if(!spreadsheetId){showToast('No sheet \u2014 click Refresh first');return;}
   const btn=document.getElementById('logBtn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Logging...';
 
@@ -828,9 +756,8 @@ async function logToSheets(){
     const tabs=['All Transactions'];
     if(prop&&prop!=='General')tabs.push(prop);
 
-    for(const tab of tabs){
-      await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent("'"+tab+"'!A:A")}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,'POST',{values:[row]});
-    }
+    const res=await fetch('/api/sheets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'log',spreadsheetId,data:{row,tabs}})});
+    if(!res.ok)throw new Error('Failed to log to sheets');
 
     transactions.push({emailId:selectedEmail.id,date,type,category:cat,desc,amount:parseFloat(amount)||0,vat:parseFloat(vat)||0,net:parseFloat(net)||0,property:prop,from:selectedEmail.from,subject:selectedEmail.subject,loggedAt});
     localStorage.setItem('dsl_tx',JSON.stringify(transactions));
@@ -867,12 +794,6 @@ function exportExcel(){
 function copyOutput(){
   const text=activeTab==='reply'?document.getElementById('replyTextarea').value:document.getElementById('aiOutput').textContent;
   navigator.clipboard.writeText(text).then(()=>showToast('Copied to clipboard'));
-}
-
-async function gapi(url,method,body){
-  const res=await fetch(url,{method,headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'HTTP '+res.status);}
-  return res.json().catch(()=>({}));
 }
 
 function escHtml(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
