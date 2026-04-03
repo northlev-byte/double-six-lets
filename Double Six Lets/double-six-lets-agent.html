@@ -173,8 +173,31 @@
   @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
   ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}::-webkit-scrollbar-thumb:hover{background:var(--text-dim);}
 
+  /* Dashboard charts */
+  .chart-section{margin-top:8px;}
+  .chart-bar-wrap{margin-bottom:6px;}
+  .chart-bar-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;}
+  .chart-bar-name{color:var(--text-muted);font-weight:500;}
+  .chart-bar-value{color:var(--text);font-weight:600;}
+  .chart-bar-track{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+  .chart-bar-fill{height:100%;border-radius:3px;transition:width .6s ease;}
+  .chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+  .chart-legend-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);}
+  .chart-legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .chart-donut-wrap{display:flex;align-items:center;gap:14px;margin-top:6px;}
+  .chart-donut{position:relative;width:70px;height:70px;flex-shrink:0;}
+  .chart-donut svg{transform:rotate(-90deg);}
+  .chart-donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:14px;color:var(--accent);}
+  .sidebar-collapse-btn{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;cursor:pointer;padding:0;font-family:'DM Sans',sans-serif;}
+  .sidebar-collapse-btn .sidebar-label{margin-bottom:0;cursor:pointer;}
+  .sidebar-collapse-btn .collapse-icon{font-size:10px;color:var(--text-dim);transition:transform .2s;}
+  .sidebar-collapse-btn.collapsed .collapse-icon{transform:rotate(-90deg);}
+  .sidebar-collapsible{overflow:hidden;transition:max-height .25s ease;max-height:500px;}
+  .sidebar-collapsible.collapsed{max-height:0;}
+
   /* Mobile sidebar toggle */
   .sidebar-toggle{display:none;position:fixed;bottom:20px;left:20px;z-index:200;width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(249,115,22,.3);align-items:center;justify-content:center;}
+  .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:49;}
 
   /* Responsive */
   @media(max-width:1100px){
@@ -182,8 +205,9 @@
   }
   @media(max-width:900px){
     .main{flex-direction:column;height:auto;min-height:calc(100vh - 65px);}
-    .sidebar{width:100%;min-width:100%;max-height:none;border-right:none;border-bottom:1px solid var(--border);display:none;position:fixed;top:65px;left:0;right:0;bottom:0;z-index:50;overflow-y:auto;background:var(--surface);}
+    .sidebar{width:85%;max-width:320px;min-width:auto;max-height:none;border-right:1px solid var(--border);display:none;position:fixed;top:65px;left:0;bottom:0;z-index:50;overflow-y:auto;background:var(--surface);box-shadow:var(--shadow-lg);}
     .sidebar.open{display:flex;}
+    .sidebar.open~.sidebar-overlay{display:block;}
     .sidebar-toggle{display:flex;}
     .email-list{width:100%;min-width:100%;max-height:45vh;border-right:none;border-bottom:1px solid var(--border);}
     .detail-panel{min-height:55vh;}
@@ -193,11 +217,16 @@
     .brand-sub{display:none;}
     .status-pill span,.sheets-pill span{display:none;}
     .status-pill .dot{margin:0;}
+    .ai-panel{max-height:320px;}
+    .ai-actions{padding:8px 12px;}
+    .detail-header{padding:14px 16px 10px;}
+    .detail-body,.detail-body-html{padding:14px 16px;}
   }
   @media(max-width:500px){
     .email-list{max-height:40vh;}
     .btn{padding:6px 12px;font-size:12px;}
     .detail-subject{font-size:17px;}
+    .sidebar{width:100%;max-width:100%;border-right:none;}
   }
 </style>
 </head>
@@ -263,6 +292,24 @@
         </div>
         <div class="recent-tx" id="recentTx"></div>
       </div>
+      <div class="sidebar-section" id="dashboardSection" style="display:none">
+        <button class="sidebar-collapse-btn" onclick="toggleCollapse('dashboard')">
+          <div class="sidebar-label">Spending by Property</div>
+          <span class="collapse-icon" id="collapse-icon-dashboard">&#9662;</span>
+        </button>
+        <div class="sidebar-collapsible" id="collapse-dashboard">
+          <div class="chart-section" id="propChart"></div>
+        </div>
+      </div>
+      <div class="sidebar-section" id="categorySection" style="display:none">
+        <button class="sidebar-collapse-btn" onclick="toggleCollapse('category')">
+          <div class="sidebar-label">By Category</div>
+          <span class="collapse-icon" id="collapse-icon-category">&#9662;</span>
+        </button>
+        <div class="sidebar-collapsible" id="collapse-category">
+          <div class="chart-donut-wrap" id="catChart"></div>
+        </div>
+      </div>
     </div>
 
     <div class="email-list">
@@ -326,6 +373,7 @@
 <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="2" rx="1" fill="currentColor"/><rect x="2" y="9" width="16" height="2" rx="1" fill="currentColor"/><rect x="2" y="14" width="16" height="2" rx="1" fill="currentColor"/></svg>
 </button>
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
 <script>
 const PROXY_URL = 'https://dsl-proxy.vercel.app/api/proxy';
@@ -556,6 +604,7 @@ function updateLogStats(){
   const tot=transactions.reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
   document.getElementById('stat-spend').textContent=tot>0?'\u00a3'+tot.toFixed(0):'\u2014';
   renderRecentTransactions();
+  renderDashboard();
 }
 
 function renderRecentTransactions(){
@@ -794,6 +843,79 @@ function exportExcel(){
 function copyOutput(){
   const text=activeTab==='reply'?document.getElementById('replyTextarea').value:document.getElementById('aiOutput').textContent;
   navigator.clipboard.writeText(text).then(()=>showToast('Copied to clipboard'));
+}
+
+// -- Dashboard charts --
+function toggleCollapse(id){
+  const content=document.getElementById('collapse-'+id);
+  const icon=document.getElementById('collapse-icon-'+id);
+  const btn=icon?.parentElement;
+  content?.classList.toggle('collapsed');
+  btn?.classList.toggle('collapsed');
+}
+
+function renderDashboard(){
+  if(!transactions.length){
+    document.getElementById('dashboardSection').style.display='none';
+    document.getElementById('categorySection').style.display='none';
+    return;
+  }
+  document.getElementById('dashboardSection').style.display='block';
+  document.getElementById('categorySection').style.display='block';
+
+  // Spending by property
+  const propSpend={};
+  transactions.forEach(t=>{
+    const p=t.property||'General';
+    propSpend[p]=(propSpend[p]||0)+(parseFloat(t.amount)||0);
+  });
+  const maxSpend=Math.max(...Object.values(propSpend),1);
+  const propColors={'39 Esher Road':'#0d9488','49 Greene Way':'#7c3aed','105 Ladywell':'#d97706','General':'#6b7080'};
+
+  document.getElementById('propChart').innerHTML=Object.entries(propSpend)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([name,amount])=>{
+      const pct=Math.round((amount/maxSpend)*100);
+      const col=propColors[name]||'var(--accent)';
+      return`<div class="chart-bar-wrap">
+        <div class="chart-bar-label"><span class="chart-bar-name">${escHtml(name)}</span><span class="chart-bar-value">\u00a3${amount.toFixed(0)}</span></div>
+        <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+      </div>`;
+    }).join('');
+
+  // Category donut
+  const catSpend={};
+  const catColors={Utility:'#7c3aed',Tenant:'#0d9488',Supplier:'#d97706',Legal:'#e11d48',Other:'#6b7080'};
+  transactions.forEach(t=>{
+    const c=t.category||'Other';
+    catSpend[c]=(catSpend[c]||0)+(parseFloat(t.amount)||0);
+  });
+  const totalSpend=Object.values(catSpend).reduce((a,b)=>a+b,0)||1;
+
+  // Build SVG donut
+  let offset=0;
+  const segments=Object.entries(catSpend).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>{
+    const pct=(amt/totalSpend)*100;
+    const dashArray=`${pct*1.57} ${157-pct*1.57}`;
+    const color=catColors[cat]||'#6b7080';
+    const seg=`<circle cx="35" cy="35" r="25" fill="none" stroke="${color}" stroke-width="10" stroke-dasharray="${dashArray}" stroke-dashoffset="${-offset*1.57}" />`;
+    offset+=pct;
+    return seg;
+  });
+
+  const legend=Object.entries(catSpend).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>{
+    const col=catColors[cat]||'#6b7080';
+    const pct=Math.round((amt/totalSpend)*100);
+    return`<div class="chart-legend-item"><span class="chart-legend-dot" style="background:${col}"></span>${cat} ${pct}%</div>`;
+  }).join('');
+
+  document.getElementById('catChart').innerHTML=`
+    <div class="chart-donut">
+      <svg width="70" height="70" viewBox="0 0 70 70">${segments.join('')}</svg>
+      <div class="chart-donut-center">\u00a3${totalSpend.toFixed(0)}</div>
+    </div>
+    <div class="chart-legend">${legend}</div>
+  `;
 }
 
 function escHtml(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
