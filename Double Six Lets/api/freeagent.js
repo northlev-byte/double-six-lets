@@ -199,15 +199,28 @@ function matchProperty(text) {
 async function handleTransactions(req, res) {
   const from = req.query.from || taxYearStart();
   const to = req.query.to || today();
+
+  // FreeAgent requires bank_account for transactions — fetch all accounts first
+  let accounts = [];
+  try {
+    const accData = await freeAgentApi('/v2/bank_accounts');
+    accounts = (accData.bank_accounts || []).map(a => a.url);
+  } catch (e) { accounts = []; }
+
   let allTx = [];
-  let page = 1;
-  while (page <= 10) {
-    const data = await freeAgentApi(`/v2/bank_transactions?from_date=${from}&to_date=${to}&per_page=100&page=${page}`);
-    const txs = data.bank_transactions || [];
-    allTx = allTx.concat(txs);
-    if (txs.length < 100) break;
-    page++;
+  for (const acct of accounts) {
+    let page = 1;
+    while (page <= 5) {
+      try {
+        const data = await freeAgentApi(`/v2/bank_transactions?bank_account=${encodeURIComponent(acct)}&from_date=${from}&to_date=${to}&per_page=100&page=${page}`);
+        const txs = data.bank_transactions || [];
+        allTx = allTx.concat(txs);
+        if (txs.length < 100) break;
+        page++;
+      } catch (e) { break; }
+    }
   }
+
   const transactions = allTx.map(t => ({
     id: t.url, date: t.dated_on, amount: parseFloat(t.amount || 0),
     description: t.description || '', category: t.category || '',
@@ -261,10 +274,11 @@ async function handleSummary(req, res) {
   const from = req.query.from || taxYearStart();
   const to = req.query.to || today();
 
+  // Fetch all data in parallel with fallbacks
   const [txRes, invRes, billRes] = await Promise.all([
-    handleTransactionsRaw(from, to),
-    handleInvoicesRaw(),
-    handleBillsRaw(),
+    handleTransactionsRaw(from, to).catch(() => []),
+    handleInvoicesRaw().catch(() => []),
+    handleBillsRaw().catch(() => []),
   ]);
 
   const byProperty = {};
@@ -320,13 +334,25 @@ async function handleSummary(req, res) {
 
 // Raw data helpers (avoid double-serialisation)
 async function handleTransactionsRaw(from, to) {
-  let allTx = [], page = 1;
-  while (page <= 10) {
-    const data = await freeAgentApi(`/v2/bank_transactions?from_date=${from}&to_date=${to}&per_page=100&page=${page}`);
-    const txs = data.bank_transactions || [];
-    allTx = allTx.concat(txs);
-    if (txs.length < 100) break;
-    page++;
+  // Fetch bank accounts first
+  let accounts = [];
+  try {
+    const accData = await freeAgentApi('/v2/bank_accounts');
+    accounts = (accData.bank_accounts || []).map(a => a.url);
+  } catch (e) { accounts = []; }
+
+  let allTx = [];
+  for (const acct of accounts) {
+    let page = 1;
+    while (page <= 3) {
+      try {
+        const data = await freeAgentApi(`/v2/bank_transactions?bank_account=${encodeURIComponent(acct)}&from_date=${from}&to_date=${to}&per_page=100&page=${page}`);
+        const txs = data.bank_transactions || [];
+        allTx = allTx.concat(txs);
+        if (txs.length < 100) break;
+        page++;
+      } catch (e) { break; }
+    }
   }
   return allTx.map(t => ({
     id: t.url, date: t.dated_on, amount: parseFloat(t.amount || 0),
