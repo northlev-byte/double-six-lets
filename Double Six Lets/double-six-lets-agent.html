@@ -125,6 +125,11 @@
   .detail-body{padding:16px 20px;line-height:1.75;color:var(--text-muted);font-size:13px;white-space:pre-wrap;word-break:break-word;}
   .detail-body-html{padding:16px 20px;}
   .detail-body-html a{color:var(--accent);}
+  .detail-body-html{background:var(--bg);color:var(--text-muted);}
+  .detail-body-html *{max-width:100%!important;color:inherit!important;background:transparent!important;font-family:inherit!important;}
+  .detail-body-html table{border-collapse:collapse;}
+  .detail-body-html td,.detail-body-html th{border:1px solid var(--border);padding:6px 8px;}
+  .detail-body-html img{max-width:100%;height:auto;border-radius:4px;}
 
   /* AI Panel */
   .ai-panel{border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;max-height:380px;}
@@ -465,13 +470,15 @@ async function fetchEmails(){
     if(lr.status===401){handleExpiry();return;}
     const ld=await lr.json();
     const ids=(ld.messages||[]).map(m=>m.id);
-    document.getElementById('listCount').textContent=ids.length+' emails';
+    document.getElementById('listCount').textContent='0 / '+ids.length;
     let emails=[];
-    for(let i=0;i<ids.length;i+=10){
-      const batch=await Promise.all(ids.slice(i,i+10).map(id=>fetchMsg(id)));
+    // Fetch in parallel batches of 15 for speed
+    for(let i=0;i<ids.length;i+=15){
+      const batch=await Promise.all(ids.slice(i,i+15).map(id=>fetchMsg(id)));
       emails=emails.concat(batch.filter(Boolean));
+      document.getElementById('listCount').textContent=emails.length+' / '+ids.length;
     }
-    showSkeletonLoading('Categorising...');
+    showSkeletonLoading('Categorising with AI...');
     allEmails=await categorise(emails);
     transactions.forEach(t=>{const e=allEmails.find(x=>x.id===t.emailId);if(e)e.logged=true;});
     renderEmails();updateStats();updateLogStats();updatePropertyCounts();
@@ -534,19 +541,52 @@ async function fetchMsg(id){
 function b64d(d){try{return decodeURIComponent(escape(atob(d.replace(/-/g,'+').replace(/_/g,'/'))));}catch{return atob(d.replace(/-/g,'+').replace(/_/g,'/'));}}
 function fmtDate(r){try{const d=new Date(r),n=new Date();if(d.toDateString()===n.toDateString())return d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}catch{return '';}}
 
+// -- Proxy helper with retry --
+async function proxyCall(body, retries=2){
+  for(let i=0;i<=retries;i++){
+    try{
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),30000);
+      const res=await fetch(PROXY_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body),
+        signal:controller.signal
+      });
+      clearTimeout(timeout);
+      if(!res.ok){
+        const err=await res.text().catch(()=>'');
+        throw new Error(`Proxy returned ${res.status}: ${err.substring(0,200)}`);
+      }
+      return await res.json();
+    }catch(e){
+      console.warn(`Proxy attempt ${i+1} failed:`,e.message);
+      if(i===retries)throw e;
+      await new Promise(r=>setTimeout(r,1000*(i+1)));
+    }
+  }
+}
+
 // -- Categorise --
 async function categorise(emails){
-  try{
-    const sums=emails.map((e,i)=>`${i}|FROM:${e.from}|SUBJ:${e.subject}|BODY:${e.body.substring(0,120)}`).join('\n');
-    const res=await fetch(PROXY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',max_tokens:2000,
-      messages:[{role:'user',content:`Double Six Lets Ltd \u2014 UK property letting company.\n${PROP_CTX}\n\nFor each email return JSON array:\n- index: number\n- category: "Tenant"|"Supplier"|"Utility"|"Legal"|"Other"\n- property: "39 Esher Road"|"49 Greene Way"|"105 Ladywell"|null\n- urgent: boolean\n- hasInvoice: boolean (true if bill/invoice/payment amount present)\n\nEmails:\n${sums}\n\nReturn ONLY valid JSON array.`}]
-    })});
-    const data=await res.json();
-    const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    const m=txt.match(/\[[\s\S]*?\]/);
-    if(m)JSON.parse(m[0]).forEach(c=>{if(emails[c.index])Object.assign(emails[c.index],{category:c.category||'Other',property:c.property||null,urgent:!!c.urgent,hasInvoice:!!c.hasInvoice});});
-  }catch(e){console.warn('Categorise failed:',e);}
+  // Process in batches of 15 for reliability
+  const batchSize=15;
+  for(let b=0;b<emails.length;b+=batchSize){
+    const batch=emails.slice(b,b+batchSize);
+    try{
+      const sums=batch.map((e,i)=>`${b+i}|FROM:${e.from}|SUBJ:${e.subject}|BODY:${e.body.substring(0,120)}`).join('\n');
+      const data=await proxyCall({
+        model:'claude-sonnet-4-20250514',max_tokens:2000,
+        messages:[{role:'user',content:`Double Six Lets Ltd \u2014 UK property letting company.\n${PROP_CTX}\n\nFor each email return JSON array:\n- index: number\n- category: "Tenant"|"Supplier"|"Utility"|"Legal"|"Other"\n- property: "39 Esher Road"|"49 Greene Way"|"105 Ladywell"|null\n- urgent: boolean\n- hasInvoice: boolean (true if bill/invoice/payment amount present)\n\nEmails:\n${sums}\n\nReturn ONLY valid JSON array.`}]
+      });
+      const txt=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+      const m=txt.match(/\[[\s\S]*?\]/);
+      if(m)JSON.parse(m[0]).forEach(c=>{if(emails[c.index])Object.assign(emails[c.index],{category:c.category||'Other',property:c.property||null,urgent:!!c.urgent,hasInvoice:!!c.hasInvoice});});
+    }catch(e){
+      console.warn(`Categorise batch ${b} failed:`,e);
+      showToast('Some emails could not be categorised');
+    }
+  }
   return emails;
 }
 
@@ -728,8 +768,7 @@ async function runAI(){
   };
 
   try{
-    const res=await fetch(PROXY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompts[activeTab]}]})});
-    const data=await res.json();
+    const data=await proxyCall({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompts[activeTab]}]});
     const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
 
     if(activeTab==='reply'){
