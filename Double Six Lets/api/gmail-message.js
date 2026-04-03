@@ -65,8 +65,8 @@ export default async function handler(req, res) {
       from,
       date: fmtDate(rawDate),
       rawDate,
-      body: body.substring(0, 1000),
-      bodyHtml: bodyHtml.substring(0, 8000),
+      body: body.substring(0, 2000),
+      bodyHtml: bodyHtml.substring(0, 30000),
     });
   } catch (err) {
     console.error('Gmail message error:', err);

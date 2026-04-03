@@ -124,18 +124,12 @@
   .detail-body{padding:16px 24px;line-height:1.6;color:var(--text-muted);font-size:13px;white-space:pre-wrap;word-break:break-word;}
   .detail-body-html{padding:16px 24px;color:var(--text-muted);font-size:13px;line-height:1.6;}
   .detail-body-html a{color:var(--accent);}
-  .detail-body-html *{max-width:100%!important;font-family:inherit!important;}
-  .detail-body-html p,.detail-body-html div{margin:0!important;padding:0!important;}
-  .detail-body-html br+br{display:none;}
-  .detail-body-html p+p,.detail-body-html div+div{margin-top:6px!important;}
-  .detail-body-html table{border-collapse:collapse;}
-  .detail-body-html td,.detail-body-html th{border:1px solid var(--border);padding:6px 10px;}
-  .detail-body-html img{max-width:100%;height:auto;border-radius:var(--radius-xs);}
-  .detail-body-html span[style*="font-size"]{font-size:inherit!important;}
-  .detail-body-html h1,.detail-body-html h2,.detail-body-html h3{font-size:15px!important;margin:8px 0 4px!important;}
+  .detail-body-html img{max-width:100%;height:auto;}
+  .detail-body-html table{max-width:100%;}
+  .detail-body-html blockquote{border-left:3px solid var(--border);margin:8px 0;padding:4px 12px;color:var(--text-dim);}
 
   /* AI Panel */
-  .ai-panel{border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;min-height:140px;max-height:380px;}
+  .ai-panel{border-bottom:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;min-height:0;max-height:380px;}
   .ai-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface2);}
   .ai-tab{padding:10px 14px;font-size:12px;font-weight:500;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
   .ai-tab:hover{color:var(--text-muted);}
@@ -352,7 +346,6 @@
             <div id="detailTags"></div>
           </div>
         </div>
-        <div class="detail-body-wrap" id="detailBodyWrap"></div>
         <div class="ai-panel">
           <div class="ai-tabs">
             <div class="ai-tab active" onclick="switchTab('summary')" id="tab-summary">Summary</div>
@@ -370,6 +363,7 @@
             <button class="btn btn-green" id="logBtn" onclick="logToSheets()" style="display:none">Log to Sheets</button>
           </div>
         </div>
+        <div class="detail-body-wrap" id="detailBodyWrap"></div>
       </div>
     </div>
   </div>
@@ -677,8 +671,8 @@ async function selectEmail(idx){
     const div=document.createElement('div');
     div.className='detail-body detail-body-html';
     div.innerHTML=DOMPurify.sanitize(selectedEmail.bodyHtml,{
-      ALLOWED_TAGS:['p','br','div','span','a','b','strong','i','em','u','ul','ol','li','h1','h2','h3','h4','h5','h6','table','tr','td','th','thead','tbody','img','blockquote','pre','code','hr'],
-      ALLOWED_ATTR:['href','src','alt','style','class','width','height','colspan','rowspan'],
+      ALLOWED_TAGS:['p','br','div','span','a','b','strong','i','em','u','ul','ol','li','h1','h2','h3','h4','h5','h6','table','tr','td','th','thead','tbody','tfoot','colgroup','col','img','blockquote','pre','code','hr','font','center','small','big','sub','sup','figure','figcaption','section','article','header','footer','nav','aside'],
+      ALLOWED_ATTR:['href','src','alt','style','class','width','height','colspan','rowspan','cellpadding','cellspacing','border','align','valign','bgcolor','color','face','size','dir','title'],
       ALLOW_DATA_ATTR:false
     });
     div.querySelectorAll('a').forEach(a=>{a.setAttribute('target','_blank');a.setAttribute('rel','noopener noreferrer');});
