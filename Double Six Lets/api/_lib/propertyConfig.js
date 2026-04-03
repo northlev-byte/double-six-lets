@@ -81,24 +81,28 @@ export const ACQUISITION_KEYWORDS = [
   'stamp duty', 'sdlt', 'completion', 'exchange', 'deposit',
 ];
 
-// FreeAgent nominal codes — correct for UK property letting company
+// FreeAgent nominal codes — matched to actual FreeAgent category list
 export const NOMINAL_CODES = {
-  RENT_RECEIVED: '001',            // Sales / Rent received
-  MORTGAGE_INTEREST: '270',        // Loan Interest Paid (only interest portion)
-  INSURANCE: '273',                // Insurance
-  REPAIRS_MAINTENANCE: '285',      // Repairs & Maintenance
-  GROUND_RENT: '289',              // Rent (ground rent / service charge)
-  UTILITIES_PROPERTY: '291',       // Light, Heat & Power (property — cost of sale)
-  UTILITIES_ADMIN: '291',          // Light, Heat & Power (office/admin)
-  TELEPHONE: '292',                // Telephone & Internet
-  MOBILE_PHONE: '292',             // Employee mobile phone
-  TRAVEL: '294',                   // Motor & Travel
-  PROFESSIONAL_FEES: '270',        // Professional Fees
-  MANAGEMENT_FEES: '270',          // Agent / Management Fees
-  GENERAL_ADMIN: '298',            // General Administrative
-  SOFTWARE: '298',                 // Computer / IT Costs
-  FURNISHINGS: '285',              // Fixtures & Fittings (treat as R&M for revenue)
-  DIRECTOR_LOAN: '270',            // Directors Loan Account
-  INTERCOMPANY: '270',             // Intercompany
-  ACQUISITION: '270',              // Capital expenditure / acquisition costs
+  RENT_RECEIVED: '001',            // Sales (income_categories)
+  MORTGAGE_INTEREST: '362',        // Interest Payable (admin_expenses)
+  INSURANCE: '364',                // Insurance (admin_expenses)
+  REPAIRS_MAINTENANCE: '101',      // Cost of Sales (property repairs/maintenance)
+  GROUND_RENT: '251',              // Rent (admin_expenses — ground rent payable)
+  UTILITIES_PROPERTY: '101',       // Cost of Sales (property utility bills)
+  UTILITIES_ADMIN: '250',          // Office Costs (admin utility)
+  TELEPHONE: '273',                // Internet & Telephone (admin_expenses)
+  MOBILE_PHONE: '274',             // Mobile Phone (admin_expenses)
+  TRAVEL: '365',                   // Travel (admin_expenses)
+  ACCOUNTANCY: '292',              // Accountancy Fees (admin_expenses)
+  PROFESSIONAL_FEES: '290',        // Legal and Professional Fees (admin_expenses)
+  CONSULTANCY: '293',              // Consultancy Fees (admin_expenses)
+  MANAGEMENT_FEES: '102',          // Commission Paid (cost_of_sales — letting agent fees)
+  GENERAL_ADMIN: '280',            // Sundries (admin_expenses)
+  SOFTWARE: '269',                 // Computer Software (admin_expenses)
+  FURNISHINGS: '602',              // Capital Asset Purchase (general — fixtures)
+  DIRECTOR_LOAN: '907',            // Director Loan Account (general)
+  DIVIDEND: '908',                 // Dividend (general)
+  INTERCOMPANY: '907',             // Director Loan Account (use for intercompany)
+  ACQUISITION: '602',              // Capital Asset Purchase (general)
+  BANK_CHARGES: '363',             // Bank/Finance Charges (admin_expenses)
 };

@@ -80,7 +80,7 @@ export function categoriseTransaction(tx) {
   // Dividends
   if (desc.includes('dividend')) {
     result.reportingCategory = 'Dividend';
-    result.freeagentNominal = NOMINAL_CODES.INTERCOMPANY;
+    result.freeagentNominal = NOMINAL_CODES.DIVIDEND;
     result.incomeType = isCredit ? 'intercompany' : null;
     result.expenseType = !isCredit ? 'intercompany' : null;
     result.excludeFromPnL = true;
@@ -182,8 +182,10 @@ export function categoriseTransaction(tx) {
 
   // Professional Fees (accountancy, legal, surveyor)
   if (has(desc, PROFESSIONAL_FEE_KEYWORDS)) {
-    result.reportingCategory = 'Professional Fees';
-    result.freeagentNominal = NOMINAL_CODES.PROFESSIONAL_FEES;
+    // Distinguish accountancy from legal/other professional
+    const isAccountancy = has(desc, ['accountant', 'accountancy', 'finance director', 'virtual finance', 'bookkeeping', 'tax return', 'self assessment']);
+    result.reportingCategory = isAccountancy ? 'Accountancy Fees' : 'Professional Fees';
+    result.freeagentNominal = isAccountancy ? NOMINAL_CODES.ACCOUNTANCY : NOMINAL_CODES.PROFESSIONAL_FEES;
     result.expenseType = 'professional_fees';
     result.confidence = 'high';
     result.requiresReview = false;
@@ -299,7 +301,7 @@ export const REPORTING_CATEGORIES = [
   'Director Loan In', 'Director Loan Out',
   'Mortgage Interest Payable', 'Mortgage Payment',
   'Utilities \u2014 Property', 'Utilities \u2014 Broadband', 'Employee Mobile Phone',
-  'Professional Fees', 'Insurance', 'Maintenance & Repairs',
+  'Accountancy Fees', 'Professional Fees', 'Insurance', 'Maintenance & Repairs',
   'Management Fees', 'Ground Rent / Service Charge', 'Furnishings',
   'Acquisition Costs', 'General / Other',
 ];

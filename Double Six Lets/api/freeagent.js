@@ -61,13 +61,8 @@ async function handleStatus(res) {
 }
 
 async function handleCategories(res) {
-  const data = await freeAgentApi('/v2/categories');
-  const categories = (data.categories || []).map(c => ({
-    url: c.url, description: c.description,
-    nominalCode: c.nominal_code, group: c.group,
-    autoSalesTaxRate: c.auto_sales_tax_rate,
-  }));
-  return res.status(200).json({ categories });
+  const cats = await getAllFACategories();
+  return res.status(200).json({ categories: cats.map(c => ({ url: c.url, description: c.description, nominalCode: c.nominal_code, group: c._group })) });
 }
 
 async function handleContacts(res) {
@@ -161,10 +156,18 @@ async function handleCreateContact(body, res) {
 let faCatCache = null;
 let faCatCacheExpiry = 0;
 
-async function getFACategories() {
+async function getAllFACategories() {
   if (faCatCache && Date.now() < faCatCacheExpiry) return faCatCache;
   const data = await freeAgentApi('/v2/categories');
-  faCatCache = data.categories || [];
+  // FreeAgent groups categories under keys: admin_expenses_categories, cost_of_sales_categories, income_categories, general_categories
+  let all = [];
+  for (const key of Object.keys(data || {})) {
+    const arr = data[key];
+    if (Array.isArray(arr)) {
+      arr.forEach(c => { c._group = key; all.push(c); });
+    }
+  }
+  faCatCache = all;
   faCatCacheExpiry = Date.now() + 5 * 60 * 1000;
   return faCatCache;
 }
@@ -174,7 +177,7 @@ async function explainSingleTransaction(transactionId, nominalCode, description)
   const tx = txData.bank_transaction;
   if (!tx) throw new Error('Transaction not found');
 
-  const allCats = await getFACategories();
+  const allCats = await getAllFACategories();
   const faCat = allCats.find(c => c.nominal_code === nominalCode);
   if (!faCat) throw new Error(`FreeAgent category not found for nominal code ${nominalCode}`);
 
