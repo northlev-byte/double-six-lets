@@ -1,7 +1,8 @@
 import { freeAgentApi } from './_lib/freeagent-auth.js';
+import { categoriseTransaction, matchProperty, REPORTING_CATEGORIES } from './_lib/categoriseTransaction.js';
+import { PROPERTIES, NOMINAL_CODES } from './_lib/propertyConfig.js';
 
 export default async function handler(req, res) {
-  // Check if FreeAgent is configured
   if (!process.env.FREEAGENT_REFRESH_TOKEN) {
     return res.status(200).json({ configured: false, error: 'FreeAgent not configured' });
   }
@@ -18,7 +19,7 @@ export default async function handler(req, res) {
         case 'invoices': return handleInvoices(res);
         case 'bills': return handleBills(res);
         case 'summary': return handleSummary(req, res);
-        case 'expense-categories': return res.status(200).json({ categories: EXPENSE_CATEGORIES.map(c => ({ name: c.name, faCode: c.faCode })) });
+        case 'reporting-categories': return res.status(200).json({ categories: REPORTING_CATEGORIES });
         default: return res.status(400).json({ error: `Unknown GET action: ${action}` });
       }
     }
@@ -31,6 +32,8 @@ export default async function handler(req, res) {
         case 'create-invoice': return handleCreateInvoice(req.body, res);
         case 'create-contact': return handleCreateContact(req.body, res);
         case 'explain-transaction': return handleExplainTransaction(req.body, res);
+        case 'explain-bulk': return handleExplainBulk(req.body, res);
+        case 'ai-categorise': return handleAICategorise(req.body, res);
         default: return res.status(400).json({ error: `Unknown POST action: ${action}` });
       }
     }
@@ -42,12 +45,13 @@ export default async function handler(req, res) {
   }
 }
 
+// ── Status & lookups ─────────────────────────────────
+
 async function handleStatus(res) {
   try {
     const data = await freeAgentApi('/v2/company');
     return res.status(200).json({
-      configured: true,
-      connected: true,
+      configured: true, connected: true,
       company: data.company?.name || 'Connected',
       currency: data.company?.currency || 'GBP',
     });
@@ -59,10 +63,8 @@ async function handleStatus(res) {
 async function handleCategories(res) {
   const data = await freeAgentApi('/v2/categories');
   const categories = (data.categories || []).map(c => ({
-    url: c.url,
-    description: c.description,
-    nominalCode: c.nominal_code,
-    group: c.group,
+    url: c.url, description: c.description,
+    nominalCode: c.nominal_code, group: c.group,
     autoSalesTaxRate: c.auto_sales_tax_rate,
   }));
   return res.status(200).json({ categories });
@@ -73,11 +75,9 @@ async function handleContacts(res) {
   const contacts = (data.contacts || []).map(c => ({
     url: c.url,
     name: c.organisation_name || `${c.first_name || ''} ${c.last_name || ''}`.trim(),
-    email: c.email,
-    type: c.contact_name_on_invoices ? 'client' : 'supplier',
+    email: c.email, type: c.contact_name_on_invoices ? 'client' : 'supplier',
     organisationName: c.organisation_name,
-    firstName: c.first_name,
-    lastName: c.last_name,
+    firstName: c.first_name, lastName: c.last_name,
   }));
   return res.status(200).json({ contacts });
 }
@@ -85,32 +85,26 @@ async function handleContacts(res) {
 async function handleBankAccounts(res) {
   const data = await freeAgentApi('/v2/bank_accounts');
   const accounts = (data.bank_accounts || []).map(a => ({
-    url: a.url,
-    name: a.name,
-    type: a.type,
-    currency: a.currency,
-    currentBalance: a.current_balance,
+    url: a.url, name: a.name, type: a.type,
+    currency: a.currency, currentBalance: a.current_balance,
   }));
   return res.status(200).json({ accounts });
 }
+
+// ── Create records ───────────────────────────────────
 
 async function handleCreateExpense(body, res) {
   const { category, amount, date, description, user } = body;
   if (!category || !amount || !date) {
     return res.status(400).json({ error: 'Missing category, amount, or date' });
   }
-
   const data = await freeAgentApi('/v2/expenses', 'POST', {
     expense: {
-      user: user || undefined,
-      category,
-      dated_on: date,
-      gross_value: String(amount),
-      description: description || '',
+      user: user || undefined, category, dated_on: date,
+      gross_value: String(amount), description: description || '',
       ec_status: 'UK/Non-EC',
     },
   });
-
   return res.status(200).json({ ok: true, expense: data.expense });
 }
 
@@ -119,24 +113,15 @@ async function handleCreateBill(body, res) {
   if (!contact || !date || !items?.length) {
     return res.status(400).json({ error: 'Missing contact, date, or items' });
   }
-
   const billItems = items.map(item => ({
-    category: item.category,
-    total_value: String(item.amount),
+    category: item.category, total_value: String(item.amount),
     description: item.description || description || '',
     sales_tax_rate: item.salesTaxRate || undefined,
   }));
-
   const data = await freeAgentApi('/v2/bills', 'POST', {
-    bill: {
-      contact,
-      reference: reference || '',
-      dated_on: date,
-      due_on: dueDate || date,
-      bill_items: billItems,
-    },
+    bill: { contact, reference: reference || '', dated_on: date,
+      due_on: dueDate || date, bill_items: billItems },
   });
-
   return res.status(200).json({ ok: true, bill: data.bill });
 }
 
@@ -145,80 +130,15 @@ async function handleCreateInvoice(body, res) {
   if (!contact || !date || !items?.length) {
     return res.status(400).json({ error: 'Missing contact, date, or items' });
   }
-
   const invoiceItems = items.map(item => ({
-    description: item.description || 'Rent',
-    price: String(item.price),
-    quantity: item.quantity || 1,
-    item_type: item.itemType || 'Services',
+    description: item.description || 'Rent', price: String(item.price),
+    quantity: item.quantity || 1, item_type: item.itemType || 'Services',
   }));
-
-  const invoice = {
-    contact,
-    dated_on: date,
-    due_on: dueDate || date,
-    payment_terms_in_days: paymentTerms || 30,
-    invoice_items: invoiceItems,
-  };
+  const invoice = { contact, dated_on: date, due_on: dueDate || date,
+    payment_terms_in_days: paymentTerms || 30, invoice_items: invoiceItems };
   if (property) invoice.property = property;
-
   const data = await freeAgentApi('/v2/invoices', 'POST', { invoice });
   return res.status(200).json({ ok: true, invoice: data.invoice });
-}
-
-async function handleExplainTransaction(body, res) {
-  const { transactionId, category, description } = body;
-  if (!transactionId || !category) {
-    return res.status(400).json({ error: 'Missing transactionId or category' });
-  }
-
-  // Find the FreeAgent category URL from our expense category name
-  const expCat = EXPENSE_CATEGORIES.find(c => c.name === category);
-  if (!expCat) {
-    return res.status(400).json({ error: `Unknown category: ${category}` });
-  }
-
-  // First get the transaction to know the amount and date
-  try {
-    const txData = await freeAgentApi(transactionId);
-    const tx = txData.bank_transaction;
-    if (!tx) return res.status(404).json({ error: 'Transaction not found' });
-
-    // Fetch FreeAgent categories to find the right URL by nominal code
-    const catData = await freeAgentApi('/v2/categories');
-    const faCat = (catData.categories || []).find(c => c.nominal_code === expCat.faCode);
-    if (!faCat) return res.status(400).json({ error: `FreeAgent category not found for code ${expCat.faCode}` });
-
-    // Check if already explained (unexplained_amount === 0 means fully explained)
-    const unexplained = parseFloat(tx.unexplained_amount || tx.amount);
-    if (Math.abs(unexplained) < 0.01) {
-      // Already explained — find and delete existing explanation, then re-create
-      try {
-        const existingExps = await freeAgentApi(`/v2/bank_transaction_explanations?bank_transaction=${encodeURIComponent(transactionId)}`);
-        const exps = existingExps.bank_transaction_explanations || [];
-        for (const exp of exps) {
-          await freeAgentApi(exp.url, 'DELETE');
-        }
-      } catch (delErr) {
-        // If we can't delete, still try to create — FreeAgent may reject if truly duplicate
-      }
-    }
-
-    // Create bank transaction explanation
-    const data = await freeAgentApi('/v2/bank_transaction_explanations', 'POST', {
-      bank_transaction_explanation: {
-        bank_transaction: transactionId,
-        category: faCat.url,
-        dated_on: tx.dated_on,
-        description: description || tx.description || '',
-        gross_value: String(unexplained !== 0 ? unexplained : tx.amount),
-      },
-    });
-
-    return res.status(200).json({ ok: true, explanation: data.bank_transaction_explanation, replaced: Math.abs(unexplained) < 0.01 });
-  } catch (err) {
-    return res.status(500).json({ error: `Failed to explain transaction: ${err.message}` });
-  }
 }
 
 async function handleCreateContact(body, res) {
@@ -226,70 +146,180 @@ async function handleCreateContact(body, res) {
   if (!organisationName && !firstName) {
     return res.status(400).json({ error: 'Missing organisationName or firstName' });
   }
-
   const contact = {};
   if (organisationName) contact.organisation_name = organisationName;
   if (firstName) contact.first_name = firstName;
   if (lastName) contact.last_name = lastName;
   if (email) contact.email = email;
-
   const data = await freeAgentApi('/v2/contacts', 'POST', { contact });
   return res.status(200).json({ ok: true, contact: data.contact });
 }
 
-// -- Financial data handlers --
+// ── Explain (sync category to FreeAgent) ─────────────
 
-const PROPERTIES = [
-  { name: '39 Esher Road', keywords: ['esher', 'l6 6de', 'l66de'] },
-  { name: '49 Greene Way', keywords: ['greene', 'greene way'] },
-  { name: '105 Ladywell', keywords: ['ladywell'] },
-];
+// Cache FreeAgent categories to avoid repeated fetches
+let faCatCache = null;
+let faCatCacheExpiry = 0;
 
-// Expense categories with FreeAgent nominal codes and keyword auto-matching
-const EXPENSE_CATEGORIES = [
-  { name: 'Mortgage / Finance', faCode: '270', keywords: ['mortgage', 'interest', 'loan', 'finance', 'lending', 'nationwide', 'santander', 'barclays', 'hsbc', 'natwest', 'halifax', 'capital repayment'] },
-  { name: 'Insurance', faCode: '273', keywords: ['insurance', 'insure', 'policy', 'premium', 'cover', 'axa', 'aviva', 'direct line', 'rl360', 'landlord insurance'] },
-  { name: 'Repairs & Maintenance', faCode: '285', keywords: ['repair', 'maintenance', 'plumber', 'plumbing', 'electrician', 'boiler', 'fix', 'handyman', 'builder', 'roofing', 'guttering', 'paint', 'decorator', 'screwfix', 'toolstation', 'b&q'] },
-  { name: 'Letting Agent Fees', faCode: '270', keywords: ['letting agent', 'management fee', 'agent fee', 'commission', 'acorn', 'openrent', 'rightmove', 'zoopla', 'onthemarket'] },
-  { name: 'Accountancy', faCode: '270', keywords: ['accountant', 'accountancy', 'bookkeeping', 'tax return', 'self assessment', 'hmrc', 'companies house', 'annual return'] },
-  { name: 'Legal / Professional', faCode: '270', keywords: ['solicitor', 'legal', 'conveyancing', 'survey', 'valuation', 'stamp duty', 'sdlt', 'land registry', 'searches'] },
-  { name: 'Utilities', faCode: '291', keywords: ['electric', 'gas', 'water', 'council tax', 'utility', 'british gas', 'edf', 'eon', 'sse', 'octopus', 'bulb', 'thames water', 'united utilities', 'severn trent'] },
-  { name: 'Ground Rent / Service Charge', faCode: '289', keywords: ['ground rent', 'service charge', 'freeholder', 'management company', 'leasehold'] },
-  { name: 'Furnishings', faCode: '285', keywords: ['furniture', 'furnish', 'carpet', 'curtain', 'blind', 'appliance', 'ikea', 'argos', 'amazon', 'john lewis', 'currys', 'ao.com'] },
-  { name: 'Travel', faCode: '294', keywords: ['travel', 'mileage', 'petrol', 'fuel', 'parking', 'train', 'rail'] },
-  { name: 'Software / Tech', faCode: '298', keywords: ['software', 'subscription', 'saas', 'google', 'microsoft', 'xero', 'freeagent', 'slack', 'zoom', 'domain', 'hosting', 'vercel', 'cloud'] },
-  { name: 'Director Expenses — Jordan Walker', faCode: '270', keywords: ['jordan walker expenses', 'jw expenses'] },
-  { name: 'Director Expenses — Keisha Walker', faCode: '270', keywords: ['keisha walker expenses', 'kw expenses'] },
-  { name: 'Director Loan — Jordan Walker', faCode: '270', keywords: ['jordan walker'] },
-  { name: 'Director Loan — Keisha Walker', faCode: '270', keywords: ['keisha walker'] },
-  { name: 'Intercompany / Dividends', faCode: '270', keywords: ['double six holdings', 'dsh', 'holdings limited', 'holdings ltd', 'dividend', 'intercompany'] },
-  { name: 'Rent Income', faCode: '001', keywords: ['rent', 'tenant', 'rental income', 'standing order'] },
-  { name: 'General / Other', faCode: '298', keywords: [] },
-];
-
-function matchProperty(text) {
-  const lower = (text || '').toLowerCase();
-  for (const p of PROPERTIES) {
-    if (p.keywords.some(k => lower.includes(k))) return p.name;
-  }
-  return 'Unassigned';
+async function getFACategories() {
+  if (faCatCache && Date.now() < faCatCacheExpiry) return faCatCache;
+  const data = await freeAgentApi('/v2/categories');
+  faCatCache = data.categories || [];
+  faCatCacheExpiry = Date.now() + 5 * 60 * 1000;
+  return faCatCache;
 }
 
-function suggestCategory(text, amount) {
-  const lower = (text || '').toLowerCase();
-  // If it's income, suggest Rent Income
-  if (amount > 0) return 'Rent Income';
-  for (const cat of EXPENSE_CATEGORIES) {
-    if (cat.keywords.length && cat.keywords.some(k => lower.includes(k))) return cat.name;
+async function explainSingleTransaction(transactionId, nominalCode, description) {
+  const txData = await freeAgentApi(transactionId);
+  const tx = txData.bank_transaction;
+  if (!tx) throw new Error('Transaction not found');
+
+  const allCats = await getFACategories();
+  const faCat = allCats.find(c => c.nominal_code === nominalCode);
+  if (!faCat) throw new Error(`FreeAgent category not found for nominal code ${nominalCode}`);
+
+  const unexplained = parseFloat(tx.unexplained_amount || tx.amount);
+  let replaced = false;
+
+  // If already explained, delete existing explanations first
+  if (Math.abs(unexplained) < 0.01) {
+    replaced = true;
+    try {
+      const existing = await freeAgentApi(`/v2/bank_transaction_explanations?bank_transaction=${encodeURIComponent(transactionId)}`);
+      for (const exp of (existing.bank_transaction_explanations || [])) {
+        await freeAgentApi(exp.url, 'DELETE');
+      }
+    } catch (e) { /* continue anyway */ }
   }
-  return 'General / Other';
+
+  const data = await freeAgentApi('/v2/bank_transaction_explanations', 'POST', {
+    bank_transaction_explanation: {
+      bank_transaction: transactionId, category: faCat.url,
+      dated_on: tx.dated_on,
+      description: description || tx.description || '',
+      gross_value: String(unexplained !== 0 ? unexplained : tx.amount),
+    },
+  });
+
+  return { ok: true, explanation: data.bank_transaction_explanation, replaced };
 }
 
-async function handleTransactions(req, res) {
-  const from = req.query.from || taxYearStart();
-  const to = req.query.to || today();
+async function handleExplainTransaction(body, res) {
+  const { transactionId, nominalCode, category, description } = body;
+  if (!transactionId) return res.status(400).json({ error: 'Missing transactionId' });
 
-  // FreeAgent requires bank_account for transactions — fetch all accounts first
+  // Accept either nominalCode directly or category name for backwards compat
+  let nominal = nominalCode;
+  if (!nominal && category) {
+    // Legacy path: look up from categoriseTransaction or hardcoded mapping
+    const cat = categoriseTransaction({ description: category, amount: -1 });
+    nominal = cat.freeagentNominal;
+  }
+  if (!nominal) return res.status(400).json({ error: 'Missing nominalCode or category' });
+
+  try {
+    const result = await explainSingleTransaction(transactionId, nominal, description);
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(500).json({ error: `Failed to explain transaction: ${err.message}` });
+  }
+}
+
+async function handleExplainBulk(body, res) {
+  const { transactions } = body;
+  if (!transactions?.length) return res.status(400).json({ error: 'No transactions provided' });
+
+  const results = [];
+  for (const tx of transactions) {
+    try {
+      const r = await explainSingleTransaction(tx.transactionId, tx.nominalCode, tx.description);
+      results.push({ transactionId: tx.transactionId, ok: true, replaced: r.replaced });
+    } catch (err) {
+      results.push({ transactionId: tx.transactionId, ok: false, error: err.message });
+    }
+  }
+
+  const succeeded = results.filter(r => r.ok).length;
+  return res.status(200).json({ ok: true, total: results.length, succeeded, failed: results.length - succeeded, results });
+}
+
+// ── AI Categorisation ────────────────────────────────
+
+async function handleAICategorise(body, res) {
+  const { transactions } = body;
+  if (!transactions?.length) return res.status(400).json({ error: 'No transactions provided' });
+
+  const proxyUrl = 'https://dsl-proxy.vercel.app/api/proxy';
+  const categories = REPORTING_CATEGORIES.join(', ');
+
+  const prompt = `You are an expert UK property accountant. Categorise each of these bank transactions for a residential property letting company called "Double Six Lets Ltd".
+
+For each transaction return the most accurate category from this list: ${categories}
+
+Also determine:
+- excludeFromPnL: true if this should NOT count toward trading profit (intercompany transfers, owner drawings, dividends, director loans, acquisition costs)
+- confidence: "high", "medium", or "low"
+- reason: brief explanation of why you chose this category
+
+IMPORTANT CONTEXT:
+- "Double Six Holdings Limited" is the parent holding company — transfers to/from it are intercompany, NOT trading income
+- "Jordan Walker" and "Keisha Walker" are directors — transfers involving them are director loans, NOT trading income
+- "Onesavings Bank" and "TMW" / "The Mortgage Works" are mortgage lenders
+- "Your Virtual Finance Director" is the company's accountant
+- Properties: 39 Esher Road, 49 Greene Way, 105 Ladywell
+- Known tenant: Ilyas (49 Greene Way)
+
+Return ONLY valid JSON: { "results": [ { "transactionId": "...", "category": "...", "excludeFromPnL": bool, "confidence": "...", "reason": "..." } ] }`;
+
+  const txList = transactions.map(t => `ID: ${t.id}\nDesc: ${t.description}\nAmount: £${t.amount}\nDate: ${t.date}`).join('\n---\n');
+
+  try {
+    const aiRes = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514', max_tokens: 2000,
+        messages: [{ role: 'user', content: `${prompt}\n\nTransactions:\n${txList}` }],
+      }),
+    });
+    const data = await aiRes.json();
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON in AI response');
+    const parsed = JSON.parse(match[0]);
+    return res.status(200).json({ ok: true, ...parsed });
+  } catch (err) {
+    return res.status(500).json({ error: `AI categorisation failed: ${err.message}` });
+  }
+}
+
+// ── Transaction data (with smart categorisation) ─────
+
+function enrichTransaction(raw) {
+  const amt = parseFloat(raw.amount || 0);
+  const desc = `${raw.description || ''} ${raw.full_description || ''}`;
+  const unexplained = parseFloat(raw.unexplained_amount || raw.amount);
+  const cat = categoriseTransaction({ description: desc, amount: amt });
+
+  return {
+    id: raw.url, date: raw.dated_on, amount: amt,
+    description: raw.description || '', fullDescription: raw.full_description || '',
+    category: raw.category || '', bankAccount: raw.bank_account || '',
+    explained: Math.abs(unexplained) < 0.01,
+    property: cat.propertyHint || 'Unassigned',
+    // Smart categorisation fields
+    reportingCategory: cat.reportingCategory,
+    freeagentNominal: cat.freeagentNominal,
+    incomeType: cat.incomeType,
+    expenseType: cat.expenseType,
+    excludeFromPnL: cat.excludeFromPnL,
+    confidence: cat.confidence,
+    requiresReview: cat.requiresReview,
+    taxFlags: cat.taxFlags,
+  };
+}
+
+async function fetchAllBankTransactions(from, to, maxPages = 5) {
   let accounts = [];
   try {
     const accData = await freeAgentApi('/v2/bank_accounts');
@@ -299,7 +329,7 @@ async function handleTransactions(req, res) {
   let allTx = [];
   for (const acct of accounts) {
     let page = 1;
-    while (page <= 5) {
+    while (page <= maxPages) {
       try {
         const data = await freeAgentApi(`/v2/bank_transactions?bank_account=${encodeURIComponent(acct)}&from_date=${from}&to_date=${to}&per_page=100&page=${page}`);
         const txs = data.bank_transactions || [];
@@ -309,94 +339,114 @@ async function handleTransactions(req, res) {
       } catch (e) { break; }
     }
   }
+  return allTx;
+}
 
-  const transactions = allTx.map(t => {
-    const amt = parseFloat(t.amount || 0);
-    const desc = `${t.description || ''} ${t.full_description || ''}`;
-    const unexplained = parseFloat(t.unexplained_amount || t.amount);
-    return {
-      id: t.url, date: t.dated_on, amount: amt,
-      description: t.description || '', category: t.category || '',
-      bankAccount: t.bank_account || '',
-      explained: Math.abs(unexplained) < 0.01,
-      property: matchProperty(desc),
-      suggestedCategory: suggestCategory(desc, amt),
-    };
-  });
+async function handleTransactions(req, res) {
+  const from = req.query.from || taxYearStart();
+  const to = req.query.to || today();
+  const raw = await fetchAllBankTransactions(from, to);
+  const transactions = raw.map(enrichTransaction);
   return res.status(200).json({ transactions });
 }
 
+// ── Invoices & Bills ─────────────────────────────────
+
 async function handleInvoices(res) {
-  let allInv = [];
-  let page = 1;
+  let all = [], page = 1;
   while (page <= 5) {
     const data = await freeAgentApi(`/v2/invoices?per_page=100&page=${page}`);
-    const invs = data.invoices || [];
-    allInv = allInv.concat(invs);
-    if (invs.length < 100) break;
+    const items = data.invoices || [];
+    all = all.concat(items);
+    if (items.length < 100) break;
     page++;
   }
-  const invoices = allInv.map(i => ({
+  const invoices = all.map(i => ({
     id: i.url, contact: i.contact, contactName: i.contact_name || '',
     amount: parseFloat(i.total_value || i.net_value || 0),
     status: i.status || 'Draft', datedOn: i.dated_on, dueOn: i.due_on,
     reference: i.reference || '',
-    property: matchProperty(`${i.reference || ''} ${i.contact_name || ''} ${(i.invoice_items || []).map(x => x.description || '').join(' ')}`),
+    property: matchProperty(`${i.reference || ''} ${i.contact_name || ''} ${(i.invoice_items || []).map(x => x.description || '').join(' ')}`) || 'Unassigned',
   }));
   return res.status(200).json({ invoices });
 }
 
 async function handleBills(res) {
-  let allBills = [];
-  let page = 1;
+  let all = [], page = 1;
   while (page <= 5) {
     const data = await freeAgentApi(`/v2/bills?per_page=100&page=${page}`);
-    const bills = data.bills || [];
-    allBills = allBills.concat(bills);
-    if (bills.length < 100) break;
+    const items = data.bills || [];
+    all = all.concat(items);
+    if (items.length < 100) break;
     page++;
   }
-  const result = allBills.map(b => ({
+  const result = all.map(b => ({
     id: b.url, contact: b.contact, contactName: b.contact_name || '',
     totalValue: parseFloat(b.total_value || 0), status: b.status || 'Open',
     datedOn: b.dated_on, dueOn: b.due_on, category: b.category || '',
     reference: b.reference || '',
-    property: matchProperty(`${b.reference || ''} ${b.contact_name || ''} ${(b.bill_items || []).map(x => x.description || '').join(' ')}`),
+    property: matchProperty(`${b.reference || ''} ${b.contact_name || ''} ${(b.bill_items || []).map(x => x.description || '').join(' ')}`) || 'Unassigned',
   }));
   return res.status(200).json({ bills: result });
 }
+
+// ── Financial Summary (accountant-accurate) ──────────
 
 async function handleSummary(req, res) {
   const from = req.query.from || taxYearStart();
   const to = req.query.to || today();
 
-  // Fetch all data in parallel with fallbacks
-  const [txRes, invRes, billRes] = await Promise.all([
-    handleTransactionsRaw(from, to).catch(() => []),
-    handleInvoicesRaw().catch(() => []),
-    handleBillsRaw().catch(() => []),
+  const [rawTx, invRes, billRes] = await Promise.all([
+    fetchAllBankTransactions(from, to, 3).catch(() => []),
+    fetchInvoicesRaw().catch(() => []),
+    fetchBillsRaw().catch(() => []),
   ]);
 
-  const byProperty = {};
+  const txRes = rawTx.map(enrichTransaction);
+
+  // Separate trading vs excluded transactions
+  const tradingTx = txRes.filter(t => !t.excludeFromPnL);
+  const excludedTx = txRes.filter(t => t.excludeFromPnL);
+
+  // Property breakdown — only from trading transactions
   const propNames = ['39 Esher Road', '49 Greene Way', '105 Ladywell', 'Unassigned'];
+  const byProperty = {};
   propNames.forEach(p => { byProperty[p] = { income: 0, expenses: 0, profit: 0, transactions: [] }; });
 
-  let totalIncome = 0, totalExpenses = 0;
+  // Add Intercompany as a virtual "property" tab
+  byProperty['Intercompany'] = { income: 0, expenses: 0, profit: 0, transactions: [] };
 
-  // Process transactions
+  let rentalIncome = 0, otherIncome = 0, intercompanyIn = 0, intercompanyOut = 0;
+  let totalAllowableExpenses = 0;
+
   txRes.forEach(t => {
-    const prop = t.property;
+    const prop = t.excludeFromPnL ? 'Intercompany' : (t.property || 'Unassigned');
     if (!byProperty[prop]) byProperty[prop] = { income: 0, expenses: 0, profit: 0, transactions: [] };
     byProperty[prop].transactions.push(t);
-    if (t.amount > 0) { totalIncome += t.amount; byProperty[prop].income += t.amount; }
-    else { totalExpenses += Math.abs(t.amount); byProperty[prop].expenses += Math.abs(t.amount); }
+
+    if (t.excludeFromPnL) {
+      if (t.amount > 0) intercompanyIn += t.amount;
+      else intercompanyOut += Math.abs(t.amount);
+    } else {
+      if (t.amount > 0) {
+        if (t.incomeType === 'rental_income') rentalIncome += t.amount;
+        else otherIncome += t.amount;
+        byProperty[prop].income += t.amount;
+      } else {
+        totalAllowableExpenses += Math.abs(t.amount);
+        byProperty[prop].expenses += Math.abs(t.amount);
+      }
+    }
   });
 
-  propNames.forEach(p => { if (byProperty[p]) byProperty[p].profit = byProperty[p].income - byProperty[p].expenses; });
+  // Calculate profit per property
+  [...propNames, 'Intercompany'].forEach(p => {
+    if (byProperty[p]) byProperty[p].profit = byProperty[p].income - byProperty[p].expenses;
+  });
 
-  // Monthly totals
+  // Monthly totals (trading only)
   const monthMap = {};
-  txRes.forEach(t => {
+  tradingTx.forEach(t => {
     const m = (t.date || '').substring(0, 7);
     if (!m) return;
     if (!monthMap[m]) monthMap[m] = { month: m, income: 0, expenses: 0, profit: 0 };
@@ -406,65 +456,63 @@ async function handleSummary(req, res) {
   const monthlyTotals = Object.values(monthMap).sort((a, b) => a.month.localeCompare(b.month));
   monthlyTotals.forEach(m => { m.profit = m.income - m.expenses; });
 
-  // Expense breakdown by category
+  // Expense breakdown by reporting category (trading only)
   const catMap = {};
-  txRes.filter(t => t.amount < 0).forEach(t => {
-    const cat = t.description || 'Other';
+  tradingTx.filter(t => t.amount < 0).forEach(t => {
+    const cat = t.reportingCategory || 'General / Other';
     catMap[cat] = (catMap[cat] || 0) + Math.abs(t.amount);
   });
   const expenseBreakdown = Object.entries(catMap).map(([category, total]) => ({ category, total }))
-    .sort((a, b) => b.total - a.total).slice(0, 15);
+    .sort((a, b) => b.total - a.total);
+
+  // Tax flags summary
+  const taxFlags = [];
+  txRes.forEach(t => {
+    if (t.taxFlags?.length) {
+      t.taxFlags.forEach(f => taxFlags.push({ ...f, transactionId: t.id, description: t.description, amount: t.amount, date: t.date }));
+    }
+  });
+
+  // Review count
+  const requiresReviewCount = txRes.filter(t => t.requiresReview).length;
 
   // Invoices
   const unpaidInvoices = invRes.filter(i => ['Draft', 'Sent', 'Viewed', 'Reminded'].includes(i.status));
   const overdueInvoices = unpaidInvoices.filter(i => i.dueOn && new Date(i.dueOn) < new Date());
   const upcomingBills = billRes.filter(b => ['Open', 'Overdue'].includes(b.status));
 
+  const totalTradingIncome = rentalIncome + otherIncome;
+  const netProfit = totalTradingIncome - totalAllowableExpenses;
+
   return res.status(200).json({
-    totalIncome, totalExpenses, netProfit: totalIncome - totalExpenses,
+    // Accountant-accurate headline numbers
+    rentalIncome,
+    otherIncome,
+    totalTradingIncome,
+    totalAllowableExpenses,
+    netProfit,
+    // Intercompany (excluded from P&L)
+    intercompanyIn,
+    intercompanyOut,
+    intercompanyNet: intercompanyIn - intercompanyOut,
+    // Legacy compat
+    totalIncome: totalTradingIncome,
+    totalExpenses: totalAllowableExpenses,
+    // Breakdowns
     byProperty, monthlyTotals, expenseBreakdown,
+    // Tax & review
+    taxFlags, requiresReviewCount,
+    // Invoices / bills
     unpaidInvoices, overdueInvoices, upcomingBills,
     invoiceCount: invRes.length, billCount: billRes.length,
+    // Categories for frontend
+    reportingCategories: REPORTING_CATEGORIES,
   });
 }
 
-// Raw data helpers (avoid double-serialisation)
-async function handleTransactionsRaw(from, to) {
-  // Fetch bank accounts first
-  let accounts = [];
-  try {
-    const accData = await freeAgentApi('/v2/bank_accounts');
-    accounts = (accData.bank_accounts || []).map(a => a.url);
-  } catch (e) { accounts = []; }
+// ── Raw data helpers ─────────────────────────────────
 
-  let allTx = [];
-  for (const acct of accounts) {
-    let page = 1;
-    while (page <= 3) {
-      try {
-        const data = await freeAgentApi(`/v2/bank_transactions?bank_account=${encodeURIComponent(acct)}&from_date=${from}&to_date=${to}&per_page=100&page=${page}`);
-        const txs = data.bank_transactions || [];
-        allTx = allTx.concat(txs);
-        if (txs.length < 100) break;
-        page++;
-      } catch (e) { break; }
-    }
-  }
-  return allTx.map(t => {
-    const amt = parseFloat(t.amount || 0);
-    const desc = `${t.description || ''} ${t.full_description || ''}`;
-    const unexplained = parseFloat(t.unexplained_amount || t.amount);
-    return {
-      id: t.url, date: t.dated_on, amount: amt,
-      description: t.description || '', category: t.category || '',
-      explained: Math.abs(unexplained) < 0.01,
-      property: matchProperty(desc),
-      suggestedCategory: suggestCategory(desc, amt),
-    };
-  });
-}
-
-async function handleInvoicesRaw() {
+async function fetchInvoicesRaw() {
   let all = [], page = 1;
   while (page <= 5) {
     const data = await freeAgentApi(`/v2/invoices?per_page=100&page=${page}`);
@@ -478,11 +526,11 @@ async function handleInvoicesRaw() {
     amount: parseFloat(i.total_value || i.net_value || 0),
     status: i.status || 'Draft', datedOn: i.dated_on, dueOn: i.due_on,
     reference: i.reference || '',
-    property: matchProperty(`${i.reference || ''} ${i.contact_name || ''}`),
+    property: matchProperty(`${i.reference || ''} ${i.contact_name || ''}`) || 'Unassigned',
   }));
 }
 
-async function handleBillsRaw() {
+async function fetchBillsRaw() {
   let all = [], page = 1;
   while (page <= 5) {
     const data = await freeAgentApi(`/v2/bills?per_page=100&page=${page}`);
@@ -495,14 +543,13 @@ async function handleBillsRaw() {
     id: b.url, contactName: b.contact_name || '',
     totalValue: parseFloat(b.total_value || 0), status: b.status || 'Open',
     datedOn: b.dated_on, dueOn: b.due_on, reference: b.reference || '',
-    property: matchProperty(`${b.reference || ''} ${b.contact_name || ''}`),
+    property: matchProperty(`${b.reference || ''} ${b.contact_name || ''}`) || 'Unassigned',
   }));
 }
 
 function taxYearStart() {
   const now = new Date();
-  // Company financial year starts November 1 (year end is October 31)
-  const month = now.getMonth(); // 0-indexed: 10 = November
+  const month = now.getMonth();
   const year = month >= 10 ? now.getFullYear() : now.getFullYear() - 1;
   return `${year}-11-01`;
 }
