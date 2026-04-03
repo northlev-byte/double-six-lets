@@ -509,7 +509,7 @@ const FOLDER_ICONS={INBOX:'\u{1F4E5}',SENT:'\u{1F4E4}',DRAFT:'\u270F\uFE0F',TRAS
 
 async function loadLabels(){
   try{
-    const res=await fetch('/api/gmail/labels');
+    const res=await fetch('/api/gmail-actions');
     if(!res.ok)return;
     const data=await res.json();
     allLabels=data.labels||[];
@@ -544,17 +544,17 @@ async function switchFolder(labelId){
 // -- Email Actions --
 async function emailAction(action,emailId,extra){
   try{
-    let url,body;
+    let body;
     switch(action){
-      case'trash':url='/api/gmail/trash';body={messageId:emailId};break;
-      case'delete':url='/api/gmail/delete';body={messageId:emailId};break;
-      case'archive':url='/api/gmail/archive';body={messageId:emailId};break;
-      case'mark-read':url='/api/gmail/mark-read';body={messageId:emailId,read:true};break;
-      case'mark-unread':url='/api/gmail/mark-read';body={messageId:emailId,read:false};break;
-      case'move':url='/api/gmail/move';body={messageId:emailId,...extra};break;
+      case'trash':body={action:'trash',messageId:emailId};break;
+      case'delete':body={action:'delete',messageId:emailId};break;
+      case'archive':body={action:'archive',messageId:emailId};break;
+      case'mark-read':body={action:'mark-read',messageId:emailId,read:true};break;
+      case'mark-unread':body={action:'mark-read',messageId:emailId,read:false};break;
+      case'move':body={action:'move',messageId:emailId,...extra};break;
       default:return;
     }
-    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const res=await fetch('/api/gmail-actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'Action failed');}
     // Optimistic removal from current view
     allEmails=allEmails.filter(e=>e.id!==emailId);
@@ -615,7 +615,7 @@ async function sendReply(){
   const btn=document.getElementById('sendBtn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Sending...';
   try{
-    const res=await fetch('/api/gmail/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    const res=await fetch('/api/gmail-actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send',
       to,subject,body,
       threadId:selectedEmail.threadId||null,
       inReplyTo:selectedEmail.messageIdHeader||null,
@@ -635,7 +635,7 @@ async function saveDraft(){
   const body=document.getElementById('composeBody')?.value||'';
 
   try{
-    const res=await fetch('/api/gmail/save-draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    const res=await fetch('/api/gmail-actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save-draft',
       to,subject,body,threadId:selectedEmail.threadId||null
     })});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'Draft save failed');}
