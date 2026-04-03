@@ -120,17 +120,22 @@
   .detail-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .detail-meta-item{font-size:12px;color:var(--text-muted);}
   .detail-meta-item strong{color:var(--text);}
-  .detail-body-wrap{flex:1;overflow-y:auto;background:var(--surface);}
-  .detail-body{padding:20px 24px;line-height:1.8;color:var(--text-muted);font-size:13px;white-space:pre-wrap;word-break:break-word;}
-  .detail-body-html{padding:20px 24px;color:var(--text-muted);}
+  .detail-body-wrap{flex:1;overflow-y:auto;background:var(--surface);min-height:0;}
+  .detail-body{padding:16px 24px;line-height:1.6;color:var(--text-muted);font-size:13px;white-space:pre-wrap;word-break:break-word;}
+  .detail-body-html{padding:16px 24px;color:var(--text-muted);font-size:13px;line-height:1.6;}
   .detail-body-html a{color:var(--accent);}
   .detail-body-html *{max-width:100%!important;font-family:inherit!important;}
+  .detail-body-html p,.detail-body-html div{margin:0!important;padding:0!important;}
+  .detail-body-html br+br{display:none;}
+  .detail-body-html p+p,.detail-body-html div+div{margin-top:6px!important;}
   .detail-body-html table{border-collapse:collapse;}
   .detail-body-html td,.detail-body-html th{border:1px solid var(--border);padding:6px 10px;}
   .detail-body-html img{max-width:100%;height:auto;border-radius:var(--radius-xs);}
+  .detail-body-html span[style*="font-size"]{font-size:inherit!important;}
+  .detail-body-html h1,.detail-body-html h2,.detail-body-html h3{font-size:15px!important;margin:8px 0 4px!important;}
 
   /* AI Panel */
-  .ai-panel{border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;max-height:380px;}
+  .ai-panel{border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;min-height:140px;max-height:380px;}
   .ai-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface2);}
   .ai-tab{padding:10px 14px;font-size:12px;font-weight:500;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
   .ai-tab:hover{color:var(--text-muted);}
