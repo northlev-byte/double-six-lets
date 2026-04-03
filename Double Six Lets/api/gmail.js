@@ -10,8 +10,11 @@ export default async function handler(req, res) {
     const label = req.query.label || 'INBOX';
 
     // 1. List message IDs (metadata only for speed)
-    const listRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&labelIds=${encodeURIComponent(label)}`,
+    // For INBOX, also filter to CATEGORY_PERSONAL (Primary tab) to exclude Promotions/Social/Updates
+    let url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&labelIds=${encodeURIComponent(label)}`;
+    if (label === 'INBOX') url += '&labelIds=CATEGORY_PERSONAL';
+
+    const listRes = await fetch(url,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
