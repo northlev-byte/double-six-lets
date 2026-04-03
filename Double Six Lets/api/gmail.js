@@ -7,10 +7,11 @@ export default async function handler(req, res) {
 
   try {
     const token = await getAccessToken();
+    const label = req.query.label || 'INBOX';
 
     // 1. List message IDs (metadata only for speed)
     const listRes = await fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&labelIds=INBOX',
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&labelIds=${encodeURIComponent(label)}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 

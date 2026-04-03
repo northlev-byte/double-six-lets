@@ -181,6 +181,51 @@
   @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
   ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}::-webkit-scrollbar-thumb:hover{background:var(--text-dim);}
 
+  /* Folder items */
+  .folder-item{display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 10px;border-radius:var(--radius-sm);border:none;background:transparent;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;text-align:left;transition:all .15s;margin-bottom:1px;}
+  .folder-item:hover{background:var(--surface2);color:var(--text);}
+  .folder-item.active{background:var(--accent-soft);color:var(--accent);font-weight:500;}
+  .folder-icon{width:16px;text-align:center;margin-right:8px;font-size:14px;opacity:.6;}
+  .folder-item.active .folder-icon{opacity:1;}
+  .folder-unread{font-size:11px;padding:1px 7px;border-radius:10px;background:var(--surface2);color:var(--text-dim);font-weight:500;min-width:20px;text-align:center;}
+  .folder-item.active .folder-unread{background:rgba(249,115,22,.1);color:var(--accent);}
+
+  /* Email action buttons */
+  .email-actions{display:flex;gap:2px;margin-left:auto;flex-shrink:0;opacity:0;transition:opacity .15s;}
+  .email-item:hover .email-actions{opacity:1;}
+  .email-action-btn{width:26px;height:26px;border:none;background:transparent;cursor:pointer;border-radius:var(--radius-xs);display:flex;align-items:center;justify-content:center;color:var(--text-dim);transition:all .12s;padding:0;}
+  .email-action-btn:hover{background:var(--surface2);color:var(--text);}
+  .email-action-btn.danger:hover{background:rgba(225,29,72,.08);color:var(--legal);}
+  .email-action-btn svg{width:14px;height:14px;}
+
+  /* Context menu */
+  .ctx-menu{position:fixed;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:4px;min-width:180px;animation:fadeIn .12s ease;}
+  .ctx-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;border:none;background:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);cursor:pointer;border-radius:var(--radius-xs);transition:background .1s;}
+  .ctx-menu-item:hover{background:var(--surface2);}
+  .ctx-menu-item.danger{color:var(--legal);}
+  .ctx-menu-item.danger:hover{background:rgba(225,29,72,.06);}
+  .ctx-menu-sep{height:1px;background:var(--border);margin:4px 8px;}
+
+  /* Move modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:400;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s ease;}
+  .modal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:20px;width:320px;max-height:400px;display:flex;flex-direction:column;}
+  .modal-title{font-family:'DM Serif Display',serif;font-size:17px;margin-bottom:12px;}
+  .modal-list{flex:1;overflow-y:auto;margin-bottom:12px;}
+  .modal-label-item{padding:8px 12px;border-radius:var(--radius-xs);cursor:pointer;font-size:13px;transition:background .1s;}
+  .modal-label-item:hover{background:var(--surface2);}
+
+  /* Compose panel */
+  .compose-panel{padding:12px 16px;display:flex;flex-direction:column;gap:8px;}
+  .compose-field{display:flex;align-items:center;gap:8px;font-size:13px;}
+  .compose-field label{color:var(--text-dim);font-size:12px;font-weight:500;min-width:50px;}
+  .compose-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 10px;outline:none;transition:all .2s;}
+  .compose-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(249,115,22,.08);}
+  .compose-body{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:10px 12px;resize:vertical;min-height:100px;outline:none;transition:all .2s;line-height:1.6;}
+  .compose-body:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(249,115,22,.08);}
+  .compose-actions{display:flex;gap:8px;align-items:center;}
+  .btn-send{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(249,115,22,.25);}
+  .btn-send:hover{background:var(--accent-dim);}
+
   /* Dashboard charts */
   .chart-section{margin-top:8px;}
   .chart-bar-wrap{margin-bottom:6px;}
@@ -255,15 +300,23 @@
 
   <div class="main">
     <div class="sidebar" id="sidebar">
+      <div class="sidebar-section" id="foldersSection">
+        <div class="sidebar-label">Folders</div>
+        <div id="folderList"><div style="padding:6px 9px;font-size:12px;color:var(--text-dim)">Loading...</div></div>
+      </div>
       <div class="sidebar-section">
-        <div class="sidebar-label">Categories</div>
+        <button class="sidebar-collapse-btn" onclick="toggleCollapse('categories')">
+          <div class="sidebar-label">Categories</div>
+          <span class="collapse-icon" id="collapse-icon-categories">&#9662;</span>
+        </button>
+        <div class="sidebar-collapsible" id="collapse-categories">
         <button class="filter-btn active" onclick="filterByCategory('all')" id="filter-all"><span class="filter-left"><span class="filter-dot" style="background:#888"></span>All Emails</span><span class="filter-count" id="count-all">0</span></button>
         <button class="filter-btn" onclick="filterByCategory('Tenant')" id="filter-Tenant"><span class="filter-left"><span class="filter-dot" style="background:var(--tenant)"></span>Tenants</span><span class="filter-count" id="count-Tenant">0</span></button>
         <button class="filter-btn" onclick="filterByCategory('Supplier')" id="filter-Supplier"><span class="filter-left"><span class="filter-dot" style="background:var(--supplier)"></span>Suppliers</span><span class="filter-count" id="count-Supplier">0</span></button>
         <button class="filter-btn" onclick="filterByCategory('Utility')" id="filter-Utility"><span class="filter-left"><span class="filter-dot" style="background:var(--utility)"></span>Utilities</span><span class="filter-count" id="count-Utility">0</span></button>
         <button class="filter-btn" onclick="filterByCategory('Legal')" id="filter-Legal"><span class="filter-left"><span class="filter-dot" style="background:var(--legal)"></span>Legal</span><span class="filter-count" id="count-Legal">0</span></button>
         <button class="filter-btn" onclick="filterByCategory('Other')" id="filter-Other"><span class="filter-left"><span class="filter-dot" style="background:var(--other)"></span>Other</span><span class="filter-count" id="count-Other">0</span></button>
-      </div>
+      </div></div>
       <div class="sidebar-section">
         <div class="sidebar-label">Properties</div>
         <div class="property-card" onclick="filterByProperty('esher')" id="prop-esher">
@@ -366,7 +419,7 @@
             <textarea class="reply-textarea" id="replyTextarea" style="display:none"></textarea>
             <div id="logPanel" style="display:none"></div>
           </div>
-          <div class="ai-actions">
+          <div class="ai-actions" id="aiActions">
             <button class="btn btn-primary" id="aiActionBtn" onclick="runAI()">Summarise</button>
             <button class="btn btn-ghost" id="copyBtn" onclick="copyOutput()" style="display:none">Copy</button>
             <button class="btn btn-green" id="logBtn" onclick="logToSheets()" style="display:none">Log to Sheets</button>
@@ -382,6 +435,8 @@
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="2" rx="1" fill="currentColor"/><rect x="2" y="9" width="16" height="2" rx="1" fill="currentColor"/><rect x="2" y="14" width="16" height="2" rx="1" fill="currentColor"/></svg>
 </button>
 <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+<div id="ctxMenu" class="ctx-menu" style="display:none"></div>
+<div id="modalContainer"></div>
 
 <script>
 const PROXY_URL = 'https://dsl-proxy.vercel.app/api/proxy';
@@ -395,7 +450,7 @@ const PROP_CTX = 'Properties managed by Double Six Lets Ltd:\n- 39 Esher Road, L
 
 let allEmails=[],filteredEmails=[],selectedEmail=null;
 let activeFilter='all',activeProp=null,activeTab='summary';
-let isLoading=false;
+let isLoading=false,activeFolder='INBOX',allLabels=[];
 let spreadsheetId=localStorage.getItem('dsl_sheet_id')||null;
 let transactions=JSON.parse(localStorage.getItem('dsl_tx')||'[]');
 let extractedData=null;
@@ -404,9 +459,13 @@ let extractedData=null;
 window.addEventListener('load',async()=>{
   updateLogStats();
   if(spreadsheetId)updateSheetPill();
+  loadLabels();
   await ensureSheet();
   await fetchEmails();
 });
+
+// Close context menu on click anywhere
+document.addEventListener('click',()=>{const m=document.getElementById('ctxMenu');if(m)m.style.display='none';});
 
 // -- Keyboard navigation --
 document.addEventListener('keydown',(e)=>{
@@ -445,6 +504,145 @@ function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('open');
 }
 
+// -- Labels / Folders --
+const FOLDER_ICONS={INBOX:'\u{1F4E5}',SENT:'\u{1F4E4}',DRAFT:'\u270F\uFE0F',TRASH:'\u{1F5D1}\uFE0F',SPAM:'\u26A0\uFE0F',STARRED:'\u2B50',IMPORTANT:'\u{1F4CC}'};
+
+async function loadLabels(){
+  try{
+    const res=await fetch('/api/gmail/labels');
+    if(!res.ok)return;
+    const data=await res.json();
+    allLabels=data.labels||[];
+    renderFolders();
+  }catch(e){console.warn('Failed to load labels:',e);}
+}
+
+function renderFolders(){
+  const el=document.getElementById('folderList');
+  el.innerHTML=allLabels.map(l=>{
+    const icon=FOLDER_ICONS[l.id]||'\u{1F4C1}';
+    const active=l.id===activeFolder?'active':'';
+    const unread=l.messagesUnread>0?`<span class="folder-unread">${l.messagesUnread}</span>`:'';
+    return`<button class="folder-item ${active}" onclick="switchFolder('${escHtml(l.id)}')" data-folder-id="${escHtml(l.id)}">
+      <span style="display:flex;align-items:center"><span class="folder-icon">${icon}</span>${escHtml(l.name)}</span>${unread}</button>`;
+  }).join('');
+}
+
+async function switchFolder(labelId){
+  activeFolder=labelId;
+  renderFolders();
+  const label=allLabels.find(l=>l.id===labelId);
+  document.getElementById('listTitle').textContent=(label?.name||labelId).toUpperCase();
+  activeFilter='all';activeProp=null;
+  document.querySelectorAll('.sidebar-section:nth-child(2) .filter-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('filter-all')?.classList.add('active');
+  document.querySelectorAll('.property-card').forEach(c=>c.classList.remove('active'));
+  await fetchEmails();
+  closeSidebarOnMobile();
+}
+
+// -- Email Actions --
+async function emailAction(action,emailId,extra){
+  try{
+    let url,body;
+    switch(action){
+      case'trash':url='/api/gmail/trash';body={messageId:emailId};break;
+      case'delete':url='/api/gmail/delete';body={messageId:emailId};break;
+      case'archive':url='/api/gmail/archive';body={messageId:emailId};break;
+      case'mark-read':url='/api/gmail/mark-read';body={messageId:emailId,read:true};break;
+      case'mark-unread':url='/api/gmail/mark-read';body={messageId:emailId,read:false};break;
+      case'move':url='/api/gmail/move';body={messageId:emailId,...extra};break;
+      default:return;
+    }
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'Action failed');}
+    // Optimistic removal from current view
+    allEmails=allEmails.filter(e=>e.id!==emailId);
+    if(selectedEmail?.id===emailId){selectedEmail=null;document.getElementById('detailEmpty').style.display='flex';document.getElementById('detailContent').style.display='none';}
+    renderEmails();updateStats();updatePropertyCounts();
+    const labels={trash:'Moved to Trash',delete:'Permanently deleted',archive:'Archived','mark-read':'Marked as read','mark-unread':'Marked as unread',move:'Moved'};
+    showToast(labels[action]||'Done');
+    loadLabels(); // Refresh unread counts
+  }catch(e){showToast('Error: '+e.message);}
+}
+
+function showContextMenu(e,emailId){
+  e.preventDefault();e.stopPropagation();
+  const menu=document.getElementById('ctxMenu');
+  const email=allEmails.find(em=>em.id===emailId);
+  const isTrash=activeFolder==='TRASH';
+  const isUnread=email?.unread;
+
+  menu.innerHTML=`
+    ${!isTrash?`<button class="ctx-menu-item" onclick="emailAction('archive','${emailId}')">Archive</button>`:''}
+    <button class="ctx-menu-item" onclick="emailAction('${isUnread?'mark-read':'mark-unread'}','${emailId}')">${isUnread?'Mark as read':'Mark as unread'}</button>
+    <button class="ctx-menu-item" onclick="showMoveModal('${emailId}')">Move to...</button>
+    <div class="ctx-menu-sep"></div>
+    ${isTrash?`<button class="ctx-menu-item danger" onclick="emailAction('delete','${emailId}')">Delete permanently</button>`
+    :`<button class="ctx-menu-item danger" onclick="emailAction('trash','${emailId}')">Move to Trash</button>`}
+  `;
+  menu.style.display='block';
+  menu.style.left=Math.min(e.clientX,window.innerWidth-200)+'px';
+  menu.style.top=Math.min(e.clientY,window.innerHeight-200)+'px';
+}
+
+function showMoveModal(emailId){
+  document.getElementById('ctxMenu').style.display='none';
+  const movable=allLabels.filter(l=>l.id!==activeFolder&&!['UNREAD','IMPORTANT','STARRED','SPAM'].includes(l.id));
+  document.getElementById('modalContainer').innerHTML=`
+    <div class="modal-overlay" onclick="closeMoveModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-title">Move to...</div>
+        <div class="modal-list">${movable.map(l=>`<div class="modal-label-item" onclick="doMove('${emailId}','${escHtml(l.id)}')">${escHtml(l.name)}</div>`).join('')}</div>
+        <button class="btn btn-ghost" onclick="closeMoveModal()" style="align-self:flex-end">Cancel</button>
+      </div>
+    </div>`;
+}
+function closeMoveModal(){document.getElementById('modalContainer').innerHTML='';}
+async function doMove(emailId,targetLabel){
+  closeMoveModal();
+  await emailAction('move',emailId,{addLabelIds:[targetLabel],removeLabelIds:[activeFolder]});
+}
+
+// -- Send / Draft --
+async function sendReply(){
+  if(!selectedEmail)return;
+  const to=document.getElementById('composeTo')?.value;
+  const subject=document.getElementById('composeSubject')?.value;
+  const body=document.getElementById('composeBody')?.value;
+  if(!to||!body){showToast('Fill in To and Body');return;}
+
+  const btn=document.getElementById('sendBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Sending...';
+  try{
+    const res=await fetch('/api/gmail/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      to,subject,body,
+      threadId:selectedEmail.threadId||null,
+      inReplyTo:selectedEmail.messageIdHeader||null,
+      references:selectedEmail.referencesHeader||null,
+    })});
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'Send failed');}
+    showToast('Email sent!');
+    switchTab('summary');
+  }catch(e){showToast('Error: '+e.message);}
+  btn.disabled=false;btn.textContent='Send';
+}
+
+async function saveDraft(){
+  if(!selectedEmail)return;
+  const to=document.getElementById('composeTo')?.value||'';
+  const subject=document.getElementById('composeSubject')?.value||'';
+  const body=document.getElementById('composeBody')?.value||'';
+
+  try{
+    const res=await fetch('/api/gmail/save-draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      to,subject,body,threadId:selectedEmail.threadId||null
+    })});
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'Draft save failed');}
+    showToast('Draft saved');
+  }catch(e){showToast('Error: '+e.message);}
+}
+
 // -- Spreadsheet --
 async function ensureSheet(){
   if(spreadsheetId){updateSheetPill();return;}
@@ -470,7 +668,7 @@ async function fetchEmails(){
   showSkeletonLoading();
 
   try{
-    const res=await fetch('/api/gmail');
+    const res=await fetch('/api/gmail?label='+encodeURIComponent(activeFolder));
     if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error||'Failed to fetch emails');}
     const data=await res.json();
     document.getElementById('listCount').textContent=data.emails.length+' emails';
@@ -572,12 +770,20 @@ function renderEmails(){
   }
   body.innerHTML=filteredEmails.map((e,i)=>{
     const col=CAT_COLORS[e.category]||'var(--other)';
-    return`<div class="email-item ${e.unread?'unread':''} ${selectedEmail?.id===e.id?'active':''}" onclick="selectEmail(${i})" style="animation-delay:${Math.min(i,20)*.025}s">
-      <div class="email-item-top"><span class="email-sender">${escHtml(friendlyFrom(e.from))}</span><span class="email-time">${escHtml(e.date)}</span></div>
+    return`<div class="email-item ${e.unread?'unread':''} ${selectedEmail?.id===e.id?'active':''}" onclick="selectEmail(${i})" oncontextmenu="showContextMenu(event,'${e.id}')" style="animation-delay:${Math.min(i,20)*.025}s">
+      <div class="email-item-top"><span class="email-sender">${escHtml(friendlyFrom(e.from))}</span>
+        <span style="display:flex;align-items:center;gap:4px">
+          <span class="email-actions">
+            <button class="email-action-btn" onclick="event.stopPropagation();emailAction('archive','${e.id}')" title="Archive"><svg viewBox="0 0 16 16" fill="none"><path d="M2 5h12v7a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="currentColor" stroke-width="1.3"/><path d="M1 3a1 1 0 011-1h12a1 1 0 011 1v2H1V3z" stroke="currentColor" stroke-width="1.3"/><path d="M6 8h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+            <button class="email-action-btn danger" onclick="event.stopPropagation();emailAction('trash','${e.id}')" title="Trash"><svg viewBox="0 0 16 16" fill="none"><path d="M3 4h10l-1 10H4L3 4z" stroke="currentColor" stroke-width="1.3"/><path d="M2 4h12M6 4V2h4v2" stroke="currentColor" stroke-width="1.3"/></svg></button>
+          </span>
+          <span class="email-time">${escHtml(e.date)}</span>
+        </span>
+      </div>
       <div class="email-subject">${escHtml(e.subject)}</div>
       <div class="email-preview">${escHtml(e.preview)}</div>
       <div class="email-tags">
-        <span class="tag" style="background:${col}22;color:${col}">${e.category}</span>
+        <span class="tag" style="background:${col}15;color:${col}">${e.category}</span>
         ${e.urgent?'<span class="tag urgent-tag">Urgent</span>':''}
         ${e.hasInvoice?'<span class="tag invoice-tag">Invoice</span>':''}
         ${e.logged?'<span class="tag logged-tag">Logged</span>':''}
@@ -740,25 +946,52 @@ function switchTab(tab){
   activeTab=tab;
   document.querySelectorAll('.ai-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
-  const labs={summary:'Summarise',reply:'Draft Reply',extract:'Extract & Log'};
-  document.getElementById('aiActionBtn').textContent=labs[tab];
-  document.getElementById('aiOutput').textContent='Click the button below to '+labs[tab].toLowerCase()+'.';
+
   document.getElementById('aiOutput').style.display='block';
   document.getElementById('replyTextarea').style.display='none';
   document.getElementById('logPanel').style.display='none';
   document.getElementById('copyBtn').style.display='none';
   document.getElementById('logBtn').style.display='none';
   extractedData=null;
+
+  const actions=document.getElementById('aiActions');
+  if(tab==='reply'&&selectedEmail){
+    // Show compose panel
+    const fromAddr=(selectedEmail.from||'').match(/<([^>]+)>/)?.[1]||selectedEmail.from||'';
+    const subj=selectedEmail.subject?.startsWith('Re:')?selectedEmail.subject:'Re: '+selectedEmail.subject;
+    document.getElementById('aiOutput').style.display='none';
+    document.getElementById('aiBody').innerHTML=`
+      <div class="compose-panel">
+        <div class="compose-field"><label>To</label><input class="compose-input" id="composeTo" value="${escA(fromAddr)}"></div>
+        <div class="compose-field"><label>Subject</label><input class="compose-input" id="composeSubject" value="${escA(subj)}"></div>
+        <textarea class="compose-body" id="composeBody" placeholder="Write your reply..."></textarea>
+      </div>`;
+    actions.innerHTML=`
+      <button class="btn btn-primary" id="aiActionBtn" onclick="runAI()">AI Draft</button>
+      <button class="btn btn-ghost" onclick="saveDraft()">Save Draft</button>
+      <button class="btn btn-send" id="sendBtn" onclick="sendReply()">Send</button>`;
+  }else{
+    const labs={summary:'Summarise',extract:'Extract & Log'};
+    document.getElementById('aiBody').innerHTML=`
+      <div class="ai-output" id="aiOutput">Click the button below to ${(labs[tab]||'analyse').toLowerCase()}.</div>
+      <textarea class="reply-textarea" id="replyTextarea" style="display:none"></textarea>
+      <div id="logPanel" style="display:none"></div>`;
+    actions.innerHTML=`
+      <button class="btn btn-primary" id="aiActionBtn" onclick="runAI()">${labs[tab]||'Analyse'}</button>
+      <button class="btn btn-ghost" id="copyBtn" onclick="copyOutput()" style="display:none">Copy</button>
+      <button class="btn btn-green" id="logBtn" onclick="logToSheets()" style="display:none">Log to Sheets</button>`;
+  }
 }
 
 async function runAI(){
   if(!selectedEmail)return;
-  const btn=document.getElementById('aiActionBtn'),output=document.getElementById('aiOutput');
+  const btn=document.getElementById('aiActionBtn');
+  const output=document.getElementById('aiOutput');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
-  output.className='ai-output loading';output.textContent='Thinking...';output.style.display='block';
-  document.getElementById('replyTextarea').style.display='none';
-  document.getElementById('logPanel').style.display='none';
-  document.getElementById('logBtn').style.display='none';
+  if(output){output.className='ai-output loading';output.textContent='Thinking...';output.style.display='block';}
+  const replyTa=document.getElementById('replyTextarea');if(replyTa)replyTa.style.display='none';
+  const logP=document.getElementById('logPanel');if(logP)logP.style.display='none';
+  const logB=document.getElementById('logBtn');if(logB)logB.style.display='none';
 
   // Extract PDF text if this email has PDF attachments and we're summarising or extracting
   let pdfText='';
@@ -792,10 +1025,11 @@ async function runAI(){
     const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
 
     if(activeTab==='reply'){
-      output.style.display='none';
-      document.getElementById('replyTextarea').value=text;
-      document.getElementById('replyTextarea').style.display='block';
-      document.getElementById('copyBtn').style.display='inline-flex';
+      // Populate compose body with AI draft
+      const composeBody=document.getElementById('composeBody');
+      if(composeBody)composeBody.value=text;
+      btn.disabled=false;btn.textContent='AI Draft';
+      return;
     }else if(activeTab==='extract'){
       const m=text.match(/\{[\s\S]*?\}/);
       if(m){
@@ -889,7 +1123,7 @@ function exportExcel(){
 
 // -- Helpers --
 function copyOutput(){
-  const text=activeTab==='reply'?document.getElementById('replyTextarea').value:document.getElementById('aiOutput').textContent;
+  const text=activeTab==='reply'?(document.getElementById('composeBody')?.value||document.getElementById('replyTextarea')?.value||''):document.getElementById('aiOutput')?.textContent||'';
   navigator.clipboard.writeText(text).then(()=>showToast('Copied to clipboard'));
 }
 
