@@ -18,6 +18,7 @@ export default async function handler(req, res) {
         case 'invoices': return handleInvoices(res);
         case 'bills': return handleBills(res);
         case 'summary': return handleSummary(req, res);
+        case 'expense-categories': return res.status(200).json({ categories: EXPENSE_CATEGORIES.map(c => ({ name: c.name, faCode: c.faCode })) });
         default: return res.status(400).json({ error: `Unknown GET action: ${action}` });
       }
     }
@@ -29,6 +30,7 @@ export default async function handler(req, res) {
         case 'create-bill': return handleCreateBill(req.body, res);
         case 'create-invoice': return handleCreateInvoice(req.body, res);
         case 'create-contact': return handleCreateContact(req.body, res);
+        case 'explain-transaction': return handleExplainTransaction(req.body, res);
         default: return res.status(400).json({ error: `Unknown POST action: ${action}` });
       }
     }
@@ -164,6 +166,46 @@ async function handleCreateInvoice(body, res) {
   return res.status(200).json({ ok: true, invoice: data.invoice });
 }
 
+async function handleExplainTransaction(body, res) {
+  const { transactionId, category, description } = body;
+  if (!transactionId || !category) {
+    return res.status(400).json({ error: 'Missing transactionId or category' });
+  }
+
+  // Find the FreeAgent category URL from our expense category name
+  const expCat = EXPENSE_CATEGORIES.find(c => c.name === category);
+  if (!expCat) {
+    return res.status(400).json({ error: `Unknown category: ${category}` });
+  }
+
+  // First get the transaction to know the amount and date
+  try {
+    const txData = await freeAgentApi(transactionId);
+    const tx = txData.bank_transaction;
+    if (!tx) return res.status(404).json({ error: 'Transaction not found' });
+
+    // Fetch FreeAgent categories to find the right URL by nominal code
+    const catData = await freeAgentApi('/v2/categories');
+    const faCat = (catData.categories || []).find(c => c.nominal_code === expCat.faCode);
+    if (!faCat) return res.status(400).json({ error: `FreeAgent category not found for code ${expCat.faCode}` });
+
+    // Create bank transaction explanation
+    const data = await freeAgentApi('/v2/bank_transaction_explanations', 'POST', {
+      bank_transaction_explanation: {
+        bank_transaction: transactionId,
+        category: faCat.url,
+        dated_on: tx.dated_on,
+        description: description || tx.description || '',
+        gross_value: String(tx.amount),
+      },
+    });
+
+    return res.status(200).json({ ok: true, explanation: data.bank_transaction_explanation });
+  } catch (err) {
+    return res.status(500).json({ error: `Failed to explain transaction: ${err.message}` });
+  }
+}
+
 async function handleCreateContact(body, res) {
   const { organisationName, firstName, lastName, email } = body;
   if (!organisationName && !firstName) {
@@ -188,12 +230,39 @@ const PROPERTIES = [
   { name: '105 Ladywell', keywords: ['ladywell'] },
 ];
 
+// Expense categories with FreeAgent nominal codes and keyword auto-matching
+const EXPENSE_CATEGORIES = [
+  { name: 'Mortgage / Finance', faCode: '270', keywords: ['mortgage', 'interest', 'loan', 'finance', 'lending', 'nationwide', 'santander', 'barclays', 'hsbc', 'natwest', 'halifax', 'capital repayment'] },
+  { name: 'Insurance', faCode: '273', keywords: ['insurance', 'insure', 'policy', 'premium', 'cover', 'axa', 'aviva', 'direct line', 'rl360', 'landlord insurance'] },
+  { name: 'Repairs & Maintenance', faCode: '285', keywords: ['repair', 'maintenance', 'plumber', 'plumbing', 'electrician', 'boiler', 'fix', 'handyman', 'builder', 'roofing', 'guttering', 'paint', 'decorator', 'screwfix', 'toolstation', 'b&q'] },
+  { name: 'Letting Agent Fees', faCode: '270', keywords: ['letting agent', 'management fee', 'agent fee', 'commission', 'acorn', 'openrent', 'rightmove', 'zoopla', 'onthemarket'] },
+  { name: 'Accountancy', faCode: '270', keywords: ['accountant', 'accountancy', 'bookkeeping', 'tax return', 'self assessment', 'hmrc', 'companies house', 'annual return'] },
+  { name: 'Legal / Professional', faCode: '270', keywords: ['solicitor', 'legal', 'conveyancing', 'survey', 'valuation', 'stamp duty', 'sdlt', 'land registry', 'searches'] },
+  { name: 'Utilities', faCode: '291', keywords: ['electric', 'gas', 'water', 'council tax', 'utility', 'british gas', 'edf', 'eon', 'sse', 'octopus', 'bulb', 'thames water', 'united utilities', 'severn trent'] },
+  { name: 'Ground Rent / Service Charge', faCode: '289', keywords: ['ground rent', 'service charge', 'freeholder', 'management company', 'leasehold'] },
+  { name: 'Furnishings', faCode: '285', keywords: ['furniture', 'furnish', 'carpet', 'curtain', 'blind', 'appliance', 'ikea', 'argos', 'amazon', 'john lewis', 'currys', 'ao.com'] },
+  { name: 'Travel', faCode: '294', keywords: ['travel', 'mileage', 'petrol', 'fuel', 'parking', 'train', 'rail'] },
+  { name: 'Software / Tech', faCode: '298', keywords: ['software', 'subscription', 'saas', 'google', 'microsoft', 'xero', 'freeagent', 'slack', 'zoom', 'domain', 'hosting', 'vercel', 'cloud'] },
+  { name: 'Rent Income', faCode: '001', keywords: ['rent', 'tenant', 'rental income', 'standing order'] },
+  { name: 'General / Other', faCode: '298', keywords: [] },
+];
+
 function matchProperty(text) {
   const lower = (text || '').toLowerCase();
   for (const p of PROPERTIES) {
     if (p.keywords.some(k => lower.includes(k))) return p.name;
   }
   return 'Unassigned';
+}
+
+function suggestCategory(text, amount) {
+  const lower = (text || '').toLowerCase();
+  // If it's income, suggest Rent Income
+  if (amount > 0) return 'Rent Income';
+  for (const cat of EXPENSE_CATEGORIES) {
+    if (cat.keywords.length && cat.keywords.some(k => lower.includes(k))) return cat.name;
+  }
+  return 'General / Other';
 }
 
 async function handleTransactions(req, res) {
@@ -221,12 +290,17 @@ async function handleTransactions(req, res) {
     }
   }
 
-  const transactions = allTx.map(t => ({
-    id: t.url, date: t.dated_on, amount: parseFloat(t.amount || 0),
-    description: t.description || '', category: t.category || '',
-    bankAccount: t.bank_account || '', explained: !!t.category,
-    property: matchProperty(`${t.description} ${t.full_description || ''}`),
-  }));
+  const transactions = allTx.map(t => {
+    const amt = parseFloat(t.amount || 0);
+    const desc = `${t.description || ''} ${t.full_description || ''}`;
+    return {
+      id: t.url, date: t.dated_on, amount: amt,
+      description: t.description || '', category: t.category || '',
+      bankAccount: t.bank_account || '', explained: !!t.category,
+      property: matchProperty(desc),
+      suggestedCategory: suggestCategory(desc, amt),
+    };
+  });
   return res.status(200).json({ transactions });
 }
 
@@ -354,11 +428,16 @@ async function handleTransactionsRaw(from, to) {
       } catch (e) { break; }
     }
   }
-  return allTx.map(t => ({
-    id: t.url, date: t.dated_on, amount: parseFloat(t.amount || 0),
-    description: t.description || '', category: t.category || '',
-    property: matchProperty(`${t.description} ${t.full_description || ''}`),
-  }));
+  return allTx.map(t => {
+    const amt = parseFloat(t.amount || 0);
+    const desc = `${t.description || ''} ${t.full_description || ''}`;
+    return {
+      id: t.url, date: t.dated_on, amount: amt,
+      description: t.description || '', category: t.category || '',
+      property: matchProperty(desc),
+      suggestedCategory: suggestCategory(desc, amt),
+    };
+  });
 }
 
 async function handleInvoicesRaw() {
