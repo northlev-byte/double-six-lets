@@ -760,12 +760,31 @@ async function runAI(){
   document.getElementById('logPanel').style.display='none';
   document.getElementById('logBtn').style.display='none';
 
-  const ctx=`From: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\nDate: ${selectedEmail.rawDate||selectedEmail.date}\nBody:\n${selectedEmail.body}`;
+  // Extract PDF text if this email has PDF attachments and we're summarising or extracting
+  let pdfText='';
+  if((activeTab==='extract'||activeTab==='summary')&&selectedEmail.attachments?.length){
+    const pdfs=selectedEmail.attachments.filter(a=>a.mimeType==='application/pdf'&&a.attachmentId);
+    if(pdfs.length){
+      output.textContent='Reading PDF attachment...';
+      for(const pdf of pdfs){
+        try{
+          const res=await fetch(`/api/pdf-extract?messageId=${encodeURIComponent(selectedEmail.id)}&attachmentId=${encodeURIComponent(pdf.attachmentId)}`);
+          if(res.ok){
+            const data=await res.json();
+            if(data.text)pdfText+=`\n\n--- PDF: ${pdf.filename} ---\n${data.text}`;
+          }
+        }catch(e){console.warn('PDF extract failed:',e);}
+      }
+      output.textContent='Thinking...';
+    }
+  }
+
+  const ctx=`From: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\nDate: ${selectedEmail.rawDate||selectedEmail.date}\nBody:\n${selectedEmail.body}${pdfText}`;
 
   const prompts={
-    summary:`You are a property management assistant for Double Six Lets Ltd.\n${PROP_CTX}\n\nAnalyse this email:\n**Summary:** 2-3 sentences\n**Property:** Which property (if any)\n**Action Required:** What needs to be done\n**Priority:** Low / Medium / High / Urgent\n\n${ctx}`,
+    summary:`You are a property management assistant for Double Six Lets Ltd.\n${PROP_CTX}\n\nAnalyse this email${pdfText?' and its attached PDF':''}:\n**Summary:** 2-3 sentences\n**Property:** Which property (if any)\n**Action Required:** What needs to be done\n**Priority:** Low / Medium / High / Urgent\n\n${ctx}`,
     reply:`You are a professional UK property letting agent for Double Six Lets Ltd.\n${PROP_CTX}\n\nDraft a concise professional reply. UK English. Sign off as "Jordan\nDouble Six Lets Ltd". No subject line.\n\n${ctx}`,
-    extract:`Extract financial data from this email for Double Six Lets Ltd, a UK property letting company.\n${PROP_CTX}\n\nReturn ONLY a JSON object:\n{\n  "type": "Expense" or "Income",\n  "description": "what this is in a few words",\n  "amount": number or null (total inc VAT),\n  "vat": number or null,\n  "net": number or null (ex VAT),\n  "property": "39 Esher Road"|"49 Greene Way"|"105 Ladywell"|"General",\n  "category": "Utility"|"Tenant"|"Supplier"|"Legal"|"Other",\n  "date": "DD/MM/YYYY",\n  "reference": "invoice/account ref or null"\n}\n\n${ctx}`
+    extract:`Extract financial data from this email${pdfText?' and its attached PDF/invoice':''} for Double Six Lets Ltd, a UK property letting company.\n${PROP_CTX}\n\nReturn ONLY a JSON object:\n{\n  "type": "Expense" or "Income",\n  "description": "what this is in a few words",\n  "amount": number or null (total inc VAT),\n  "vat": number or null,\n  "net": number or null (ex VAT),\n  "property": "39 Esher Road"|"49 Greene Way"|"105 Ladywell"|"General",\n  "category": "Utility"|"Tenant"|"Supplier"|"Legal"|"Other",\n  "date": "DD/MM/YYYY",\n  "reference": "invoice/account ref or null"\n}\n\n${ctx}`
   };
 
   try{
