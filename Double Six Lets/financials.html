@@ -313,7 +313,7 @@ function renderCharts(){
         {label:'Expenses',data:propNames.map(p=>bp[p]?.expenses||0),backgroundColor:chartColors.red+'55'},
         {label:'Profit',data:propNames.map(p=>bp[p]?.profit||0),backgroundColor:chartColors.blue+'55'}
       ]
-    },options:{indexAxis:'horizontal',responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},scales:{x:{ticks:{callback:v=>'\u00a3'+v}}}}
+    },options:{indexAxis:'y',responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},scales:{x:{ticks:{callback:v=>'\u00a3'+v}}}}
   });
 
   // Cumulative Cash Flow
