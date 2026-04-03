@@ -122,11 +122,20 @@
   .detail-meta-item strong{color:var(--text);}
   .detail-body-wrap{flex:1;overflow-y:auto;background:var(--surface);min-height:0;}
   .detail-body{padding:16px 24px;line-height:1.6;color:var(--text-muted);font-size:13px;white-space:pre-wrap;word-break:break-word;}
-  .detail-body-html{padding:16px 24px;color:var(--text-muted);font-size:13px;line-height:1.6;}
+  .detail-body-html{padding:16px 24px;color:var(--text-muted);font-size:13px;line-height:1.5;}
   .detail-body-html a{color:var(--accent);}
   .detail-body-html img{max-width:100%;height:auto;}
   .detail-body-html table{max-width:100%;}
   .detail-body-html blockquote{border-left:3px solid var(--border);margin:8px 0;padding:4px 12px;color:var(--text-dim);}
+  .detail-body-html p{margin:0 0 4px;}
+  .detail-body-html br{line-height:1.2;}
+
+  /* Attachments */
+  .attachments-bar{display:flex;flex-wrap:wrap;gap:6px;padding:10px 24px;border-bottom:1px solid var(--border);background:var(--surface2);}
+  .attachment-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;color:var(--text);text-decoration:none;cursor:pointer;transition:all .15s;font-weight:500;}
+  .attachment-chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);}
+  .attachment-icon{display:flex;align-items:center;}
+  .attachment-size{color:var(--text-dim);font-weight:400;margin-left:2px;}
 
   /* AI Panel */
   .ai-panel{border-bottom:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;min-height:0;max-height:380px;}
@@ -660,9 +669,9 @@ async function selectEmail(idx){
         const msg=await res.json();
         selectedEmail.body=msg.body||'';
         selectedEmail.bodyHtml=msg.bodyHtml||'';
-        // Update the email in allEmails too for AI context
+        selectedEmail.attachments=msg.attachments||[];
         const em=allEmails.find(e=>e.id===selectedEmail.id);
-        if(em){em.body=msg.body||'';em.bodyHtml=msg.bodyHtml||'';}
+        if(em){em.body=msg.body||'';em.bodyHtml=msg.bodyHtml||'';em.attachments=msg.attachments||[];}
       }
     }catch(e){console.warn('Failed to load email body:',e);}
   }
@@ -681,6 +690,27 @@ async function selectEmail(idx){
     bw.innerHTML=`<div class="detail-body">${escHtml(selectedEmail.body)}</div>`;
   }else{
     bw.innerHTML='<div class="detail-body" style="color:var(--text-dim)">No content available.</div>';
+  }
+
+  // Render attachments
+  const atts=selectedEmail.attachments||[];
+  if(atts.length){
+    const attBar=document.createElement('div');
+    attBar.className='attachments-bar';
+    attBar.innerHTML=atts.map(a=>{
+      const ext=(a.filename||'').split('.').pop().toLowerCase();
+      const icons={pdf:'<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M5 5h4M5 7h4M5 9h2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>',
+        png:'<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="5" cy="6" r="1.5" stroke="currentColor" stroke-width="1"/><path d="M1 10l3-3 2 2 3-3 4 4" stroke="currentColor" stroke-width="1" fill="none"/></svg>',
+        jpg:'<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="5" cy="6" r="1.5" stroke="currentColor" stroke-width="1"/><path d="M1 10l3-3 2 2 3-3 4 4" stroke="currentColor" stroke-width="1" fill="none"/></svg>'};
+      const icon=icons[ext]||icons.pdf;
+      const size=a.size>1024*1024?(a.size/(1024*1024)).toFixed(1)+' MB':a.size>1024?Math.round(a.size/1024)+' KB':a.size+' B';
+      if(a.attachmentId){
+        return`<a class="attachment-chip" href="/api/gmail-attachment?messageId=${encodeURIComponent(selectedEmail.id)}&attachmentId=${encodeURIComponent(a.attachmentId)}&filename=${encodeURIComponent(a.filename)}" target="_blank" title="Open ${escHtml(a.filename)}">
+          <span class="attachment-icon">${icon}</span>${escHtml(a.filename)}<span class="attachment-size">(${size})</span></a>`;
+      }
+      return`<span class="attachment-chip"><span class="attachment-icon">${icon}</span>${escHtml(a.filename)}<span class="attachment-size">(${size})</span></span>`;
+    }).join('');
+    bw.insertBefore(attBar,bw.firstChild);
   }
 
   const cat=selectedEmail.category,col=CAT_COLORS[cat]||'var(--other)';

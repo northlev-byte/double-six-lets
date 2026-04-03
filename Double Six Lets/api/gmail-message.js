@@ -34,8 +34,9 @@ export default async function handler(req, res) {
 
     let bodyText = '';
     let bodyHtml = '';
+    const attachments = [];
 
-    // Extract body from MIME parts
+    // Extract body and attachments from MIME parts
     function extractParts(parts) {
       for (const p of parts || []) {
         if (p.mimeType === 'text/plain' && p.body?.data && !bodyText) {
@@ -43,6 +44,15 @@ export default async function handler(req, res) {
         }
         if (p.mimeType === 'text/html' && p.body?.data && !bodyHtml) {
           bodyHtml = b64d(p.body.data);
+        }
+        // Collect attachments (PDFs, images, docs, etc.)
+        if (p.filename && p.filename.length > 0) {
+          attachments.push({
+            filename: p.filename,
+            mimeType: p.mimeType,
+            size: p.body?.size || 0,
+            attachmentId: p.body?.attachmentId || null,
+          });
         }
         if (p.parts) extractParts(p.parts);
       }
@@ -55,6 +65,16 @@ export default async function handler(req, res) {
       else bodyText = d;
     }
 
+    // Check top-level for attachment
+    if (msg.payload?.filename && msg.payload.filename.length > 0) {
+      attachments.push({
+        filename: msg.payload.filename,
+        mimeType: msg.payload.mimeType,
+        size: msg.payload.body?.size || 0,
+        attachmentId: msg.payload.body?.attachmentId || null,
+      });
+    }
+
     extractParts(msg.payload?.parts);
 
     const body = bodyText || bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -65,8 +85,9 @@ export default async function handler(req, res) {
       from,
       date: fmtDate(rawDate),
       rawDate,
-      body: body.substring(0, 2000),
-      bodyHtml: bodyHtml.substring(0, 30000),
+      body: body.substring(0, 3000),
+      bodyHtml, // No cap — send full HTML for proper signature rendering
+      attachments,
     });
   } catch (err) {
     console.error('Gmail message error:', err);
