@@ -1,9 +1,9 @@
 import {
   TENANTS, PROPERTIES, KNOWN_MORTGAGE_LENDERS, INTERCOMPANY_KEYWORDS,
   OWNER_KEYWORDS, OWNER_NAMES, UTILITY_PROVIDERS, BROADBAND_PROVIDERS,
-  PROFESSIONAL_FEE_KEYWORDS, INSURANCE_KEYWORDS, MAINTENANCE_KEYWORDS,
-  MANAGEMENT_FEE_KEYWORDS, GROUND_RENT_KEYWORDS, FURNISHING_KEYWORDS,
-  ACQUISITION_KEYWORDS, NOMINAL_CODES,
+  MOBILE_PHONE_KEYWORDS, PROFESSIONAL_FEE_KEYWORDS, INSURANCE_KEYWORDS,
+  MAINTENANCE_KEYWORDS, MANAGEMENT_FEE_KEYWORDS, GROUND_RENT_KEYWORDS,
+  FURNISHING_KEYWORDS, ACQUISITION_KEYWORDS, NOMINAL_CODES,
 } from './propertyConfig.js';
 
 function lower(s) { return (s || '').toLowerCase(); }
@@ -47,14 +47,21 @@ export function categoriseTransaction(tx) {
   // ──────────────────────────────────────────────────
 
   // Owner drawings / transfers to/from company
+  // Note: FreeAgent labels all director transfers as "Jordan Walker // Double Six Lets Lt"
+  // regardless of who made them. We label generically; user can manually assign to Jordan/Keisha.
   if (has(desc, OWNER_KEYWORDS)) {
-    result.reportingCategory = 'Owner Drawing / Intercompany';
+    // Try to detect specific director from description
+    const isKeisha = desc.includes('keisha');
+    const directorName = isKeisha ? 'Keisha Walker' : null; // null = ambiguous, could be either
+    result.reportingCategory = directorName
+      ? `Director Loan \u2014 ${directorName}`
+      : 'Director Loan';
     result.freeagentNominal = NOMINAL_CODES.DIRECTOR_LOAN;
     result.incomeType = isCredit ? 'intercompany' : null;
     result.expenseType = !isCredit ? 'intercompany' : null;
     result.excludeFromPnL = true;
-    result.confidence = 'high';
-    result.requiresReview = false;
+    result.confidence = isKeisha ? 'high' : 'medium';
+    result.requiresReview = !isKeisha; // flag for review since we can't tell Jordan from Keisha
     return result;
   }
 
@@ -127,33 +134,46 @@ export function categoriseTransaction(tx) {
 
   // Mortgage / Finance
   if (has(desc, KNOWN_MORTGAGE_LENDERS)) {
-    result.reportingCategory = 'Mortgage Payment';
+    // Default to "Mortgage Interest Payable" since that's the allowable portion
+    result.reportingCategory = 'Mortgage Interest Payable';
     result.freeagentNominal = NOMINAL_CODES.MORTGAGE_INTEREST;
     result.expenseType = 'mortgage';
     result.confidence = 'high';
     result.requiresReview = false;
     result.taxFlags.push({
       code: 'SECTION_24',
-      message: 'Section 24 — only the interest portion of this mortgage payment is tax-deductible. Capital repayment is not an allowable expense.',
+      message: 'Section 24 — only the interest portion of this mortgage payment is tax-deductible. Capital repayment is not an allowable expense. You may need to split this into interest vs capital.',
       severity: 'warning',
+      dismissable: true,
     });
     return result;
   }
 
-  // Utilities (energy, water)
+  // Utilities — Property (energy, water at rental properties = cost of sale)
   if (has(desc, UTILITY_PROVIDERS)) {
-    result.reportingCategory = 'Utilities';
-    result.freeagentNominal = NOMINAL_CODES.UTILITIES;
+    const linkedProperty = matchProperty(tx.description);
+    result.reportingCategory = linkedProperty ? 'Utilities \u2014 Property' : 'Utilities \u2014 Property';
+    result.freeagentNominal = NOMINAL_CODES.UTILITIES_PROPERTY;
     result.expenseType = 'utilities';
     result.confidence = 'high';
     result.requiresReview = false;
     return result;
   }
 
-  // Broadband / Phone (still utilities category)
+  // Mobile Phone (employee)
+  if (has(desc, MOBILE_PHONE_KEYWORDS)) {
+    result.reportingCategory = 'Employee Mobile Phone';
+    result.freeagentNominal = NOMINAL_CODES.MOBILE_PHONE;
+    result.expenseType = 'other';
+    result.confidence = 'high';
+    result.requiresReview = false;
+    return result;
+  }
+
+  // Broadband / Internet (office/admin utility)
   if (has(desc, BROADBAND_PROVIDERS)) {
-    result.reportingCategory = 'Utilities — Broadband';
-    result.freeagentNominal = NOMINAL_CODES.UTILITIES;
+    result.reportingCategory = 'Utilities \u2014 Broadband';
+    result.freeagentNominal = NOMINAL_CODES.TELEPHONE;
     result.expenseType = 'utilities';
     result.confidence = 'high';
     result.requiresReview = false;
@@ -174,6 +194,7 @@ export function categoriseTransaction(tx) {
         code: 'ACQUISITION_COST',
         message: 'This may be an acquisition cost (capital) rather than a revenue expense. Acquisition costs are not deductible against rental income.',
         severity: 'warning',
+        dismissable: true,
       });
     }
     return result;
@@ -200,6 +221,7 @@ export function categoriseTransaction(tx) {
       code: 'CAPEX_VS_REVENUE',
       message: 'Verify this is a repair (revenue, deductible) and not an improvement (capital, not immediately deductible).',
       severity: 'info',
+      dismissable: true,
     });
     return result;
   }
@@ -235,6 +257,7 @@ export function categoriseTransaction(tx) {
       code: 'CAPEX_VS_REVENUE',
       message: 'Furnishings may qualify for Replacement Domestic Items Relief rather than immediate deduction.',
       severity: 'info',
+      dismissable: true,
     });
     return result;
   }
@@ -251,6 +274,7 @@ export function categoriseTransaction(tx) {
       code: 'ACQUISITION_COST',
       message: 'Acquisition cost — capital expenditure, not deductible against rental income. Added to base cost for CGT purposes.',
       severity: 'warning',
+      dismissable: true,
     });
     return result;
   }
@@ -270,9 +294,11 @@ export { matchProperty };
 // List of all reporting categories (for frontend dropdown)
 export const REPORTING_CATEGORIES = [
   'Rent Income', 'Other Income',
-  'Intercompany Transfer', 'Owner Drawing / Intercompany', 'Dividend',
+  'Intercompany Transfer', 'Director Loan', 'Dividend',
+  'Director Loan \u2014 Jordan Walker', 'Director Loan \u2014 Keisha Walker',
   'Director Loan In', 'Director Loan Out',
-  'Mortgage Payment', 'Utilities', 'Utilities — Broadband',
+  'Mortgage Interest Payable', 'Mortgage Payment',
+  'Utilities \u2014 Property', 'Utilities \u2014 Broadband', 'Employee Mobile Phone',
   'Professional Fees', 'Insurance', 'Maintenance & Repairs',
   'Management Fees', 'Ground Rent / Service Charge', 'Furnishings',
   'Acquisition Costs', 'General / Other',

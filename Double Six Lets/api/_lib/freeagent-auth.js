@@ -60,7 +60,8 @@ export async function freeAgentApi(path, method = 'GET', body = null) {
   };
   if (body) opts.body = JSON.stringify(body);
 
-  const res = await fetch(`${baseUrl}${path}`, opts);
+  const url = path.startsWith('http') ? path : `${baseUrl}${path}`;
+  const res = await fetch(url, opts);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `FreeAgent API error: ${res.status}`);

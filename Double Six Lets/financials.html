@@ -61,9 +61,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .data-table .amount{font-family:'DM Serif Display',serif;font-weight:400;}
 .data-table .amount.positive{color:var(--green);}
 .data-table .amount.negative{color:var(--red);}
-.data-table tr.excluded{opacity:.5;background:repeating-linear-gradient(135deg,transparent,transparent 3px,rgba(0,0,0,.02) 3px,rgba(0,0,0,.02) 6px);}
+.data-table tr.excluded{opacity:.6;background:repeating-linear-gradient(135deg,transparent,transparent 3px,rgba(0,0,0,.02) 3px,rgba(0,0,0,.02) 6px);}
 .data-table tr.excluded td{text-decoration:line-through;text-decoration-color:var(--text-dim);}
 .data-table tr.excluded td.no-strike{text-decoration:none;}
+.data-table tr.excluded select,.data-table tr.excluded button{text-decoration:none;opacity:1;pointer-events:auto;}
 .status-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
 .status-paid{background:rgba(16,185,129,.1);color:var(--green);}
 .status-unpaid{background:rgba(217,119,6,.1);color:var(--amber);}
@@ -201,6 +202,31 @@ let summaryData=null,activeProperty='all',activeDateRange='taxyear',activeInvTab
 let chartInstances={};
 let reportingCategories=[];
 
+// ── Persistent overrides (survives page reload) ──
+const OVERRIDES_KEY='dsl_tx_overrides';
+function loadOverrides(){try{return JSON.parse(localStorage.getItem(OVERRIDES_KEY)||'{}');}catch(e){return {};}}
+function saveOverride(txId,field,value){
+  const o=loadOverrides();
+  if(!o[txId])o[txId]={};
+  o[txId][field]=value;
+  localStorage.setItem(OVERRIDES_KEY,JSON.stringify(o));
+}
+function applyOverrides(){
+  if(!summaryData)return;
+  const o=loadOverrides();
+  if(!Object.keys(o).length)return;
+  for(const prop of Object.keys(summaryData.byProperty||{})){
+    (summaryData.byProperty[prop].transactions||[]).forEach(t=>{
+      const ov=o[t.id];
+      if(!ov)return;
+      if(ov.category){t.overrideCategory=ov.category;t.reportingCategory=ov.category;t.requiresReview=false;t.confidence='high';}
+      if(ov.property&&ov.property!==t.property){
+        // Property reassignment is handled separately in reassignProperty
+      }
+    });
+  }
+}
+
 window.addEventListener('load',()=>loadAll());
 
 async function loadAll(){
@@ -210,6 +236,7 @@ async function loadAll(){
     if(!res.ok)throw new Error('Failed to fetch financial data');
     summaryData=await res.json();
     reportingCategories=summaryData.reportingCategories||[];
+    applyOverrides();
     renderKPIs();renderCharts();renderTransactions();renderInvBills();renderTaxReview();
   }catch(e){
     document.getElementById('kpiIncome').textContent='Error';
@@ -314,20 +341,34 @@ function renderCharts(){
   });
 }
 
-// ── Tax Review Panel ──
+// ── Tax Review Panel (with dismissable flags) ──
+const DISMISSED_FLAGS_KEY='dsl_dismissed_flags';
+function getDismissedFlags(){try{return JSON.parse(localStorage.getItem(DISMISSED_FLAGS_KEY)||'[]');}catch(e){return [];}}
+function dismissFlag(txId,code){
+  const dismissed=getDismissedFlags();
+  const key=`${txId}__${code}`;
+  if(!dismissed.includes(key)){dismissed.push(key);localStorage.setItem(DISMISSED_FLAGS_KEY,JSON.stringify(dismissed));}
+  renderTaxReview();
+  showToast('Flag dismissed');
+}
 function renderTaxReview(){
   if(!summaryData)return;
-  const flags=summaryData.taxFlags||[];
+  const allFlags=summaryData.taxFlags||[];
+  const dismissed=getDismissedFlags();
+  const flags=allFlags.filter(f=>!dismissed.includes(`${f.transactionId}__${f.code}`));
   const panel=document.getElementById('taxReviewPanel');
   const content=document.getElementById('taxReviewContent');
   if(!flags.length){panel.style.display='none';return;}
   panel.style.display='block';
-  content.innerHTML=`<table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Flag</th><th>Detail</th></tr></thead><tbody>
+  const dismissedCount=allFlags.length-flags.length;
+  content.innerHTML=`${dismissedCount?`<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">${dismissedCount} flag${dismissedCount>1?'s':''} previously dismissed</div>`:''}
+    <table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Flag</th><th>Detail</th><th></th></tr></thead><tbody>
     ${flags.map(f=>{
       const icon=f.severity==='warning'?'\u26A0\uFE0F':'\u2139\uFE0F';
       return`<tr><td>${esc(f.date||'')}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.description||'')}</td>
       <td class="amount negative">\u00a3${Math.abs(f.amount||0).toFixed(2)}</td>
-      <td>${icon} ${esc(f.code)}</td><td style="font-size:12px;color:var(--text-muted);max-width:300px">${esc(f.message)}</td></tr>`;
+      <td>${icon} ${esc(f.code)}</td><td style="font-size:12px;color:var(--text-muted);max-width:280px">${esc(f.message)}</td>
+      <td>${f.dismissable?`<button onclick="dismissFlag('${esc(f.transactionId)}','${esc(f.code)}')" class="btn btn-ghost btn-sm" title="Acknowledge and dismiss">Dismiss</button>`:''}</td></tr>`;
     }).join('')}</tbody></table>`;
 }
 
@@ -400,7 +441,7 @@ function renderTransactions(){
       return`<tr class="${isExcluded?'excluded':''}">
       <td>${esc(t.date||'')}</td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.description||'')}">${esc(t.description||'')}${isExcluded?' <span class="badge-excluded">EXCL P&L</span>':''}${t.requiresReview?' <span class="badge-review">REVIEW</span>':''}</td>
-      <td class="no-strike"><select data-txid="${esc(t.id)}" data-nominal="${esc(t.freeagentNominal||'')}" onchange="assignCategory(this)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);max-width:160px;">
+      <td class="no-strike"><select data-txid="${esc(t.id)}" data-nominal="${esc(t.freeagentNominal||'')}" onchange="assignCategory(this)" style="font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);min-width:140px;max-width:200px;">
         ${cats.map(c=>`<option ${cat===c?'selected':''}>${c}</option>`).join('')}
       </select>${hasFlags?` <span class="badge-flag" title="${esc(flagTitles)}">\u26A0\uFE0F</span>`:''}<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${confColor};margin-left:4px;" title="Confidence: ${conf}"></span></td>
       <td class="no-strike"><select data-txid="${esc(t.id)}" onchange="reassignProperty(this)" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface);max-width:110px;">
@@ -435,7 +476,7 @@ function assignCategory(sel){
   const txId=sel.dataset.txid;
   const cat=sel.value;
   const tx=findTx(txId);
-  if(tx){tx.overrideCategory=cat;showToast('Category: '+cat);}
+  if(tx){tx.overrideCategory=cat;tx.reportingCategory=cat;tx.requiresReview=false;tx.confidence='high';saveOverride(txId,'category',cat);showToast('Category: '+cat);}
 }
 
 function reassignProperty(sel){
@@ -456,6 +497,7 @@ function reassignProperty(sel){
         bp[p].expenses=trading.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
         bp[p].profit=bp[p].income-bp[p].expenses;
       }
+      saveOverride(txId,'property',newProp);
       renderKPIs();renderCharts();
       showToast('Property: '+newProp);return;
     }
@@ -519,6 +561,7 @@ async function aiCategoriseUncategorised(){
           tx.confidence=r.confidence||'medium';
           tx.requiresReview=false;
           if(r.excludeFromPnL!==undefined)tx.excludeFromPnL=r.excludeFromPnL;
+          saveOverride(r.transactionId,'category',r.category);
           applied++;
         }
       });

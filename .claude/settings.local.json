@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo:*)",
+      "Bash(gh auth:*)",
+      "WebFetch(domain:northlev-byte.github.io)",
+      "Bash(curl -s https://northlev-byte.github.io/double-six-lets/double-six-lets-agent.html)",
+      "Bash(curl -sL https://northlev-byte.github.io/double-six-lets/double-six-lets-agent.html)",
+      "Bash(curl -v \"https://northlev-byte.github.io/double-six-lets/double-six-lets-agent.html\")",
+      "Bash(curl -sL --ssl-no-revoke https://northlev-byte.github.io/double-six-lets/double-six-lets-agent.html)",
+      "WebFetch(domain:dsl-proxy.vercel.app)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X OPTIONS -H \"Origin: https://northlev-byte.github.io\" -H \"Access-Control-Request-Method: POST\" https://dsl-proxy.vercel.app/api/proxy)",
+      "Bash(curl -v -X POST -H \"Content-Type: application/json\" -H \"Origin: https://northlev-byte.github.io\" -d '{\"\"\"\"model\"\"\"\":\"\"\"\"claude-sonnet-4-20250514\"\"\"\",\"\"\"\"max_tokens\"\"\"\":10,\"\"\"\"messages\"\"\"\":[{\"\"\"\"role\"\"\"\":\"\"\"\"user\"\"\"\",\"\"\"\"content\"\"\"\":\"\"\"\"hi\"\"\"\"}]}' https://dsl-proxy.vercel.app/api/proxy)",
+      "Bash(curl -k -s -X POST -H \"Content-Type: application/json\" -H \"Origin: https://northlev-byte.github.io\" -d '{\"\"model\"\":\"\"claude-sonnet-4-20250514\"\",\"\"max_tokens\"\":10,\"\"messages\"\":[{\"\"role\"\":\"\"user\"\",\"\"content\"\":\"\"hi\"\"}]}' https://dsl-proxy.vercel.app/api/proxy)",
+      "Bash(npx vercel:*)",
+      "Bash(vercel --yes)",
+      "Bash(vercel --yes --name double-six-lets)",
+      "Bash(vercel --prod --yes)",
+      "WebFetch(domain:double-six-lets.vercel.app)",
+      "Bash(vercel --prod --yes --force)",
+      "Bash(npm install:*)",
+      "Bash(curl -k -s \"https://double-six-lets.vercel.app/api/freeagent?action=status\")",
+      "Bash(curl -k -s \"https://double-six-lets.vercel.app/api/freeagent?action=summary&from=2025-04-06&to=2026-04-03\")",
+      "Bash(curl -k -s \"https://double-six-lets.vercel.app/api/freeagent?action=transactions&from=2026-03-01&to=2026-04-03\")",
+      "Bash(curl -k -s \"https://double-six-lets.vercel.app/api/freeagent?action=invoices\")",
+      "Bash(curl -k -s \"https://double-six-lets.vercel.app/api/freeagent?action=bank-accounts\")",
+      "Bash(curl -k -s \"https://double-six-lets.vercel.app/api/freeagent?action=summary\")",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(''''Income:'''',d.get\\(''''totalIncome''''\\)\\);print\\(''''Expenses:'''',d.get\\(''''totalExpenses''''\\)\\);print\\(''''Tx count:'''',sum\\(len\\(p.get\\(''''transactions'''',[]\\)\\) for p in d.get\\(''''byProperty'''',{}\\).values\\(\\)\\)\\);print\\(''''Monthly:'''',len\\(d.get\\(''''monthlyTotals'''',[]\\)\\)\\)\")",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(''''Income:'''',d.get\\(''''totalIncome''''\\)\\);print\\(''''Expenses:'''',d.get\\(''''totalExpenses''''\\)\\)\")",
+      "Bash(gh pr:*)",
+      "Bash(where gh:*)",
+      "Bash(where vercel:*)"
+    ]
+  }
+}

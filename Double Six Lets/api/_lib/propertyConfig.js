@@ -23,6 +23,7 @@ export const OWNER_KEYWORDS = [
   'jordan walker // double six',
   'keisha walker // double six lets',
   'keisha walker // double six',
+  'walker // double six lets',
 ];
 
 export const OWNER_NAMES = ['jordan walker', 'keisha walker'];
@@ -34,8 +35,13 @@ export const UTILITY_PROVIDERS = [
 ];
 
 export const BROADBAND_PROVIDERS = [
-  'virgin media', 'bt ', 'sky ', 'plusnet', 'vodafone', 'ee ',
+  'virgin media', 'bt ', 'sky ', 'plusnet',
   'talktalk', 'hyperoptic',
+];
+
+export const MOBILE_PHONE_KEYWORDS = [
+  'vodafone', 'ee ', 'three ', 'o2 ', 'giffgaff', 'tesco mobile',
+  'id mobile', 'mobile phone', 'sim only',
 ];
 
 export const PROFESSIONAL_FEE_KEYWORDS = [
@@ -82,7 +88,10 @@ export const NOMINAL_CODES = {
   INSURANCE: '273',                // Insurance
   REPAIRS_MAINTENANCE: '285',      // Repairs & Maintenance
   GROUND_RENT: '289',              // Rent (ground rent / service charge)
-  UTILITIES: '291',                // Light, Heat & Power
+  UTILITIES_PROPERTY: '291',       // Light, Heat & Power (property — cost of sale)
+  UTILITIES_ADMIN: '291',          // Light, Heat & Power (office/admin)
+  TELEPHONE: '292',                // Telephone & Internet
+  MOBILE_PHONE: '292',             // Employee mobile phone
   TRAVEL: '294',                   // Motor & Travel
   PROFESSIONAL_FEES: '270',        // Professional Fees
   MANAGEMENT_FEES: '270',          // Agent / Management Fees
