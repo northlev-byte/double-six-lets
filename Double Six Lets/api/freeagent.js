@@ -398,11 +398,10 @@ async function handleBillsRaw() {
 
 function taxYearStart() {
   const now = new Date();
-  // UK tax year starts April 6. If we're before April 6, use previous year.
-  const month = now.getMonth(); // 0-indexed: 3 = April
-  const day = now.getDate();
-  const year = (month > 3 || (month === 3 && day >= 6)) ? now.getFullYear() : now.getFullYear() - 1;
-  return `${year}-04-06`;
+  // Company financial year starts November 1 (year end is October 31)
+  const month = now.getMonth(); // 0-indexed: 10 = November
+  const year = month >= 10 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${year}-11-01`;
 }
 
 function today() {
