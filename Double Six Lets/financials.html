@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Double Six Lets — Financials</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23f97316'/><text x='16' y='22' text-anchor='middle' font-family='serif' font-size='14' font-weight='700' fill='%23fff'>66</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f8f8fa;--surface:#fff;--surface2:#f1f1f5;--border:#e4e4ea;--accent:#f97316;--accent-dim:#ea670c;--accent-soft:rgba(249,115,22,.08);--text:#1a1a2e;--text-muted:#6b7080;--text-dim:#a0a4b0;--green:#10b981;--red:#e11d48;--amber:#d97706;--blue:#3b82f6;--shadow:0 2px 8px rgba(0,0,0,.06);--shadow-lg:0 8px 30px rgba(0,0,0,.08);--radius:12px;--radius-sm:8px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:rgba(255,255,255,.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:15px;color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(249,115,22,.25);}
+.brand-name{font-family:'DM Serif Display',serif;font-size:18px;}
+.brand-sub{font-size:10px;color:var(--text-dim);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px;}
+.nav-links{display:flex;gap:4px;}
+.nav-link{padding:7px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--text-muted);transition:all .15s;text-decoration:none;}
+.nav-link:hover{background:var(--surface2);color:var(--text);}
+.nav-link.active{background:var(--accent-soft);color:var(--accent);}
+.header-right{display:flex;gap:8px;align-items:center;}
+.btn{padding:7px 16px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .2s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(249,115,22,.25);}
+.btn-ghost{background:var(--surface);color:var(--text-muted);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.page{max-width:1400px;margin:0 auto;padding:24px;}
+
+/* KPI Cards */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.kpi-label{font-size:12px;color:var(--text-muted);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.kpi-value{font-family:'DM Serif Display',serif;font-size:28px;line-height:1;margin-bottom:4px;}
+.kpi-value.green{color:var(--green);}
+.kpi-value.red{color:var(--red);}
+.kpi-value.amber{color:var(--amber);}
+.kpi-change{font-size:11px;font-weight:500;}
+.kpi-change.up{color:var(--green);}
+.kpi-change.down{color:var(--red);}
+
+/* Tabs */
+.tab-row{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap;}
+.tab-btn{padding:8px 18px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer;transition:all .15s;}
+.tab-btn:hover{border-color:var(--accent);color:var(--accent);}
+.tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* Date filter */
+.date-filter{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap;}
+.date-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-muted);cursor:pointer;transition:all .15s;}
+.date-btn:hover{border-color:var(--accent);}
+.date-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* Charts */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.chart-title{font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;}
+.chart-card canvas{width:100%!important;max-height:280px;}
+
+/* Tables */
+.section-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:24px;}
+.section-title{font-family:'DM Serif Display',serif;font-size:18px;margin-bottom:16px;}
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table th{text-align:left;padding:8px 12px;border-bottom:2px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);font-weight:600;}
+.data-table td{padding:8px 12px;border-bottom:1px solid var(--border);}
+.data-table tr:hover{background:var(--surface2);}
+.data-table .amount{font-family:'DM Serif Display',serif;font-weight:400;}
+.data-table .amount.positive{color:var(--green);}
+.data-table .amount.negative{color:var(--red);}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
+.status-paid{background:rgba(16,185,129,.1);color:var(--green);}
+.status-unpaid{background:rgba(217,119,6,.1);color:var(--amber);}
+.status-overdue{background:rgba(225,29,72,.1);color:var(--red);}
+.status-draft{background:var(--surface2);color:var(--text-dim);}
+.table-total{font-weight:600;background:var(--surface2);}
+.table-total td{border-bottom:none;}
+
+/* AI Insights */
+.insights-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:24px;}
+.insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
+.insight-card{padding:12px 16px;border-radius:var(--radius-sm);font-size:13px;line-height:1.6;}
+.insight-card.highlight{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);color:#065f46;}
+.insight-card.warning{background:rgba(217,119,6,.06);border:1px solid rgba(217,119,6,.15);color:#92400e;}
+.insight-card .insight-icon{font-size:16px;margin-bottom:4px;}
+.recs-list{margin-top:12px;padding-left:20px;font-size:13px;line-height:2;color:var(--text-muted);}
+.recs-list li{margin-bottom:4px;}
+.tax-box{margin-top:14px;padding:14px 16px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:var(--radius-sm);font-size:13px;line-height:1.6;color:#1e40af;}
+.cashflow-summary{font-size:14px;line-height:1.7;color:var(--text-muted);margin-bottom:14px;padding:12px 16px;background:var(--surface2);border-radius:var(--radius-sm);}
+
+/* Skeleton */
+.skeleton{background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.5s ease infinite;border-radius:6px;height:20px;}
+@keyframes shimmer{0%{background-position:200% 0}to{background-position:-200% 0}}
+.skeleton-kpi{height:60px;margin-bottom:8px;}
+
+/* Spinner */
+.spinner{width:15px;height:15px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 18px;font-size:13px;z-index:999;animation:fadeUp .25s ease;box-shadow:var(--shadow-lg);}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+
+/* Print */
+@media print{header,.date-filter,.btn,.tab-row{display:none!important;}.page{padding:0;max-width:100%;}.chart-card,.section-card,.insights-panel,.kpi-card{break-inside:avoid;box-shadow:none;border:1px solid #ddd;}}
+
+/* Responsive */
+@media(max-width:900px){.kpi-row{grid-template-columns:1fr 1fr;}.charts-grid{grid-template-columns:1fr;}.insight-grid{grid-template-columns:1fr;}.data-table{font-size:12px;}.data-table th,.data-table td{padding:6px 8px;}}
+@media(max-width:500px){.kpi-row{grid-template-columns:1fr;}.kpi-value{font-size:24px;}.page{padding:14px;}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="brand-mark">66</div>
+    <div><div class="brand-name">Double Six Lets</div><div class="brand-sub">Financials</div></div>
+  </div>
+  <nav class="nav-links">
+    <a href="/" class="nav-link">Inbox</a>
+    <a href="/financials.html" class="nav-link active">Financials</a>
+  </nav>
+  <div class="header-right">
+    <button class="btn btn-ghost" onclick="exportCSV()">Export CSV</button>
+    <button class="btn btn-ghost" onclick="window.print()">Print Summary</button>
+    <button class="btn btn-primary" onclick="loadAll()">Refresh</button>
+  </div>
+</header>
+
+<div class="page">
+  <!-- Date Filter -->
+  <div class="date-filter">
+    <button class="date-btn" onclick="setDateRange('month')">This Month</button>
+    <button class="date-btn" onclick="setDateRange('3months')">Last 3 Months</button>
+    <button class="date-btn active" onclick="setDateRange('taxyear')" id="dateBtn-taxyear">This Tax Year</button>
+    <button class="date-btn" onclick="setDateRange('12months')">Last 12 Months</button>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-row" id="kpiRow">
+    <div class="kpi-card"><div class="kpi-label">Total Income</div><div class="kpi-value green skeleton-kpi" id="kpiIncome"></div></div>
+    <div class="kpi-card"><div class="kpi-label">Total Expenses</div><div class="kpi-value red skeleton-kpi" id="kpiExpenses"></div></div>
+    <div class="kpi-card"><div class="kpi-label">Net Profit</div><div class="kpi-value skeleton-kpi" id="kpiProfit"></div></div>
+    <div class="kpi-card"><div class="kpi-label">Outstanding</div><div class="kpi-value amber skeleton-kpi" id="kpiOutstanding"></div></div>
+  </div>
+
+  <!-- Property Tabs -->
+  <div class="tab-row" id="propTabs">
+    <button class="tab-btn active" onclick="setPropertyTab('all')">All Properties</button>
+    <button class="tab-btn" onclick="setPropertyTab('39 Esher Road')">39 Esher Road</button>
+    <button class="tab-btn" onclick="setPropertyTab('49 Greene Way')">49 Greene Way</button>
+    <button class="tab-btn" onclick="setPropertyTab('105 Ladywell')">105 Ladywell</button>
+  </div>
+
+  <!-- Property Summary Cards -->
+  <div class="kpi-row" id="propSummary" style="display:none"></div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card"><div class="chart-title">Monthly Income vs Expenses</div><canvas id="chartMonthly"></canvas></div>
+    <div class="chart-card"><div class="chart-title">Expense Breakdown</div><canvas id="chartExpenses"></canvas></div>
+    <div class="chart-card"><div class="chart-title">Profit by Property</div><canvas id="chartProperty"></canvas></div>
+    <div class="chart-card"><div class="chart-title">Cumulative Cash Flow</div><canvas id="chartCashflow"></canvas></div>
+  </div>
+
+  <!-- Transactions Table -->
+  <div class="section-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div class="section-title" id="txTitle">Transactions</div>
+      <span id="txCount" style="font-size:12px;color:var(--text-dim)"></span>
+    </div>
+    <div style="overflow-x:auto;" id="txTableWrap">
+      <div class="skeleton" style="height:200px;width:100%"></div>
+    </div>
+  </div>
+
+  <!-- Invoices & Bills -->
+  <div class="section-card">
+    <div class="tab-row" style="margin-bottom:14px;">
+      <button class="tab-btn active" onclick="setInvTab('invoices')" id="invTabBtn">Invoices</button>
+      <button class="tab-btn" onclick="setInvTab('bills')" id="billTabBtn">Bills</button>
+    </div>
+    <div id="invBillWrap"><div class="skeleton" style="height:150px;width:100%"></div></div>
+  </div>
+
+  <!-- AI Insights -->
+  <div class="insights-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div class="section-title">AI Financial Insights</div>
+      <button class="btn btn-ghost" onclick="generateInsights()" id="insightsBtn">Generate Insights</button>
+    </div>
+    <div id="insightsContent"><div style="padding:20px;text-align:center;color:var(--text-dim);font-size:13px">Click "Generate Insights" to get AI-powered analysis of your finances.</div></div>
+  </div>
+</div>
+
+<script>
+const PROXY_URL='https://dsl-proxy.vercel.app/api/proxy';
+let summaryData=null,activeProperty='all',activeDateRange='taxyear',activeInvTab='invoices';
+let chartInstances={};
+
+// -- Init --
+window.addEventListener('load',()=>loadAll());
+
+async function loadAll(){
+  const dates=getDateRange();
+  try{
+    const res=await fetch(`/api/freeagent?action=summary&from=${dates.from}&to=${dates.to}`);
+    if(!res.ok)throw new Error('Failed to fetch financial data');
+    summaryData=await res.json();
+    renderKPIs();renderCharts();renderTransactions();renderInvBills();
+  }catch(e){
+    document.getElementById('kpiIncome').textContent='Error';
+    document.getElementById('kpiIncome').className='kpi-value';
+    showToast('Error loading financials: '+e.message);
+  }
+}
+
+function getDateRange(){
+  const now=new Date();
+  let from,to=now.toISOString().split('T')[0];
+  switch(activeDateRange){
+    case'month':from=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];break;
+    case'3months':const d3=new Date(now);d3.setMonth(d3.getMonth()-3);from=d3.toISOString().split('T')[0];break;
+    case'12months':const d12=new Date(now);d12.setFullYear(d12.getFullYear()-1);from=d12.toISOString().split('T')[0];break;
+    default:const yr=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;from=`${yr}-04-06`;break;
+  }
+  return{from,to};
+}
+
+function setDateRange(range){
+  activeDateRange=range;
+  document.querySelectorAll('.date-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.date-btn[onclick*="${range}"]`)?.classList.add('active');
+  loadAll();
+}
+
+function setPropertyTab(prop){
+  activeProperty=prop;
+  document.querySelectorAll('#propTabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  if(prop!=='all'){
+    const pd=summaryData?.byProperty?.[prop]||{income:0,expenses:0,profit:0};
+    document.getElementById('propSummary').style.display='grid';
+    document.getElementById('propSummary').innerHTML=`
+      <div class="kpi-card"><div class="kpi-label">Income</div><div class="kpi-value green">\u00a3${pd.income.toFixed(0)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Expenses</div><div class="kpi-value red">\u00a3${pd.expenses.toFixed(0)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Profit</div><div class="kpi-value ${pd.profit>=0?'green':'red'}">\u00a3${pd.profit.toFixed(0)}</div></div>
+    `;
+    document.getElementById('propSummary').style.gridTemplateColumns='repeat(3,1fr)';
+  }else{
+    document.getElementById('propSummary').style.display='none';
+  }
+  renderTransactions();renderCharts();
+}
+
+// -- KPIs --
+function renderKPIs(){
+  if(!summaryData)return;
+  document.getElementById('kpiIncome').textContent='\u00a3'+summaryData.totalIncome.toFixed(0);
+  document.getElementById('kpiIncome').className='kpi-value green';
+  document.getElementById('kpiExpenses').textContent='\u00a3'+summaryData.totalExpenses.toFixed(0);
+  document.getElementById('kpiExpenses').className='kpi-value red';
+  const np=summaryData.netProfit;
+  document.getElementById('kpiProfit').textContent=(np>=0?'\u00a3':'-\u00a3')+Math.abs(np).toFixed(0);
+  document.getElementById('kpiProfit').className='kpi-value '+(np>=0?'green':'red');
+  const outstanding=summaryData.unpaidInvoices.reduce((s,i)=>s+i.amount,0);
+  document.getElementById('kpiOutstanding').textContent='\u00a3'+outstanding.toFixed(0);
+  document.getElementById('kpiOutstanding').className='kpi-value amber';
+}
+
+// -- Charts --
+function renderCharts(){
+  if(!summaryData)return;
+  const mt=summaryData.monthlyTotals||[];
+  const bp=summaryData.byProperty||{};
+  const eb=summaryData.expenseBreakdown||[];
+
+  // Destroy existing charts
+  Object.values(chartInstances).forEach(c=>c.destroy());
+  chartInstances={};
+
+  const chartColors={green:'#10b981',red:'#e11d48',amber:'#d97706',blue:'#3b82f6',accent:'#f97316',purple:'#7c3aed',teal:'#0d9488'};
+
+  // Monthly Income vs Expenses
+  chartInstances.monthly=new Chart(document.getElementById('chartMonthly'),{
+    type:'bar',data:{
+      labels:mt.map(m=>m.month),
+      datasets:[
+        {label:'Income',data:mt.map(m=>m.income),backgroundColor:chartColors.green+'33',borderColor:chartColors.green,borderWidth:1.5},
+        {label:'Expenses',data:mt.map(m=>m.expenses),backgroundColor:chartColors.red+'33',borderColor:chartColors.red,borderWidth:1.5},
+        {label:'Profit',data:mt.map(m=>m.profit),backgroundColor:chartColors.blue+'33',borderColor:chartColors.blue,borderWidth:1.5,type:'line',fill:false,tension:.3}
+      ]
+    },options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>'\u00a3'+v}}}}
+  });
+
+  // Expense Breakdown
+  const topCats=eb.slice(0,8);
+  const catColors=['#f97316','#e11d48','#7c3aed','#0d9488','#d97706','#3b82f6','#6b7080','#10b981'];
+  chartInstances.expenses=new Chart(document.getElementById('chartExpenses'),{
+    type:'doughnut',data:{
+      labels:topCats.map(c=>c.category.substring(0,25)),
+      datasets:[{data:topCats.map(c=>c.total),backgroundColor:catColors,borderWidth:0}]
+    },options:{responsive:true,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}
+  });
+
+  // Property Profit
+  const propNames=Object.keys(bp).filter(p=>p!=='Unassigned');
+  const propColors=[chartColors.teal,chartColors.purple,chartColors.amber,chartColors.blue];
+  chartInstances.property=new Chart(document.getElementById('chartProperty'),{
+    type:'bar',data:{
+      labels:propNames,
+      datasets:[
+        {label:'Income',data:propNames.map(p=>bp[p]?.income||0),backgroundColor:chartColors.green+'55'},
+        {label:'Expenses',data:propNames.map(p=>bp[p]?.expenses||0),backgroundColor:chartColors.red+'55'},
+        {label:'Profit',data:propNames.map(p=>bp[p]?.profit||0),backgroundColor:chartColors.blue+'55'}
+      ]
+    },options:{indexAxis:'horizontal',responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},scales:{x:{ticks:{callback:v=>'\u00a3'+v}}}}
+  });
+
+  // Cumulative Cash Flow
+  let cumulative=0;
+  const cumData=mt.map(m=>{cumulative+=m.profit;return cumulative;});
+  chartInstances.cashflow=new Chart(document.getElementById('chartCashflow'),{
+    type:'line',data:{
+      labels:mt.map(m=>m.month),
+      datasets:[{label:'Cumulative Cash Flow',data:cumData,borderColor:chartColors.accent,backgroundColor:chartColors.accent+'15',fill:true,tension:.4,pointRadius:3}]
+    },options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'\u00a3'+v}}}}
+  });
+}
+
+// -- Transactions Table --
+function renderTransactions(){
+  if(!summaryData)return;
+  let txs=[];
+  const bp=summaryData.byProperty||{};
+  if(activeProperty==='all'){
+    Object.values(bp).forEach(p=>txs=txs.concat(p.transactions||[]));
+  }else{
+    txs=bp[activeProperty]?.transactions||[];
+  }
+  txs.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  document.getElementById('txCount').textContent=txs.length+' transactions';
+  const wrap=document.getElementById('txTableWrap');
+  if(!txs.length){wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-dim)">No transactions found for this period.</div>';return;}
+
+  wrap.innerHTML=`<table class="data-table">
+    <thead><tr><th>Date</th><th>Description</th><th>Property</th><th>Amount</th></tr></thead>
+    <tbody>${txs.slice(0,100).map(t=>`<tr>
+      <td>${esc(t.date||'')}</td>
+      <td>${esc(t.description||'')}</td>
+      <td><select onchange="reassignProperty('${esc(t.id)}',this.value)" style="font-size:12px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--surface);">
+        ${['39 Esher Road','49 Greene Way','105 Ladywell','Unassigned'].map(p=>`<option ${t.property===p?'selected':''}>${p}</option>`).join('')}
+      </select></td>
+      <td class="amount ${t.amount>=0?'positive':'negative'}">${t.amount>=0?'+':''}${'\u00a3'}${Math.abs(t.amount).toFixed(2)}</td>
+    </tr>`).join('')}
+    ${txs.length>100?`<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Showing first 100 of ${txs.length}</td></tr>`:''}
+    </tbody></table>`;
+}
+
+function reassignProperty(txId,newProp){
+  // Client-side reassignment (updates the view, doesn't persist to FreeAgent)
+  if(!summaryData)return;
+  const bp=summaryData.byProperty;
+  for(const prop of Object.keys(bp)){
+    const idx=(bp[prop].transactions||[]).findIndex(t=>t.id===txId);
+    if(idx>-1){
+      const tx=bp[prop].transactions.splice(idx,1)[0];
+      tx.property=newProp;
+      if(!bp[newProp])bp[newProp]={income:0,expenses:0,profit:0,transactions:[]};
+      bp[newProp].transactions.push(tx);
+      // Recalculate
+      for(const p of Object.keys(bp)){
+        bp[p].income=bp[p].transactions.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+        bp[p].expenses=bp[p].transactions.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
+        bp[p].profit=bp[p].income-bp[p].expenses;
+      }
+      renderKPIs();renderCharts();renderTransactions();
+      showToast('Reassigned to '+newProp);
+      return;
+    }
+  }
+}
+
+// -- Invoices & Bills --
+function setInvTab(tab){
+  activeInvTab=tab;
+  document.getElementById('invTabBtn').classList.toggle('active',tab==='invoices');
+  document.getElementById('billTabBtn').classList.toggle('active',tab==='bills');
+  renderInvBills();
+}
+
+function renderInvBills(){
+  if(!summaryData)return;
+  const wrap=document.getElementById('invBillWrap');
+
+  if(activeInvTab==='invoices'){
+    const invs=summaryData.unpaidInvoices||[];
+    const total=invs.reduce((s,i)=>s+i.amount,0);
+    if(!invs.length){wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-dim)">No outstanding invoices.</div>';return;}
+    wrap.innerHTML=`<table class="data-table">
+      <thead><tr><th>Contact</th><th>Amount</th><th>Status</th><th>Due Date</th><th>Property</th></tr></thead>
+      <tbody>${invs.map(i=>{
+        const overdue=i.dueOn&&new Date(i.dueOn)<new Date();
+        const badge=overdue?'overdue':i.status.toLowerCase()==='paid'?'paid':'unpaid';
+        return`<tr><td>${esc(i.contactName)}</td><td class="amount">\u00a3${i.amount.toFixed(2)}</td>
+        <td><span class="status-badge status-${badge}">${overdue?'Overdue':i.status}</span></td>
+        <td>${esc(i.dueOn||'')}</td><td>${esc(i.property)}</td></tr>`;
+      }).join('')}
+      <tr class="table-total"><td>Total</td><td class="amount">\u00a3${total.toFixed(2)}</td><td colspan="3"></td></tr>
+      </tbody></table>`;
+  }else{
+    const bills=summaryData.upcomingBills||[];
+    const total=bills.reduce((s,b)=>s+b.totalValue,0);
+    if(!bills.length){wrap.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-dim)">No outstanding bills.</div>';return;}
+    wrap.innerHTML=`<table class="data-table">
+      <thead><tr><th>Supplier</th><th>Amount</th><th>Status</th><th>Due Date</th><th>Property</th></tr></thead>
+      <tbody>${bills.map(b=>{
+        const overdue=b.dueOn&&new Date(b.dueOn)<new Date();
+        const badge=overdue?'overdue':b.status.toLowerCase()==='paid'?'paid':'unpaid';
+        return`<tr><td>${esc(b.contactName)}</td><td class="amount">\u00a3${b.totalValue.toFixed(2)}</td>
+        <td><span class="status-badge status-${badge}">${overdue?'Overdue':b.status}</span></td>
+        <td>${esc(b.dueOn||'')}</td><td>${esc(b.property)}</td></tr>`;
+      }).join('')}
+      <tr class="table-total"><td>Total</td><td class="amount">\u00a3${total.toFixed(2)}</td><td colspan="3"></td></tr>
+      </tbody></table>`;
+  }
+}
+
+// -- AI Insights --
+async function generateInsights(){
+  if(!summaryData){showToast('Load financial data first');return;}
+  const btn=document.getElementById('insightsBtn');
+  const wrap=document.getElementById('insightsContent');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Analysing...';
+  wrap.innerHTML='<div style="padding:30px;text-align:center"><span class="spinner" style="width:24px;height:24px"></span><div style="margin-top:10px;color:var(--text-dim);font-size:13px">Generating AI insights...</div></div>';
+
+  try{
+    const prompt=`You are a property investment financial advisor. Analyse this UK landlord's financial data across their portfolio and provide specific, actionable recommendations.
+
+Properties:
+- 39 Esher Road, Liverpool L6 6DE (active tenancy)
+- 49 Greene Way (active tenancy)
+- 105 Ladywell (currently in conveyancing/purchasing)
+
+Financial Summary:
+- Total Income: \u00a3${summaryData.totalIncome.toFixed(2)}
+- Total Expenses: \u00a3${summaryData.totalExpenses.toFixed(2)}
+- Net Profit: \u00a3${summaryData.netProfit.toFixed(2)}
+- Unpaid Invoices: ${summaryData.unpaidInvoices?.length||0} totalling \u00a3${(summaryData.unpaidInvoices||[]).reduce((s,i)=>s+i.amount,0).toFixed(2)}
+- Overdue Invoices: ${summaryData.overdueInvoices?.length||0}
+- Open Bills: ${summaryData.upcomingBills?.length||0}
+
+Per-Property Breakdown:
+${Object.entries(summaryData.byProperty||{}).map(([p,d])=>`${p}: Income \u00a3${d.income.toFixed(0)}, Expenses \u00a3${d.expenses.toFixed(0)}, Profit \u00a3${d.profit.toFixed(0)}`).join('\n')}
+
+Monthly Totals (recent):
+${(summaryData.monthlyTotals||[]).slice(-6).map(m=>`${m.month}: Income \u00a3${m.income.toFixed(0)}, Expenses \u00a3${m.expenses.toFixed(0)}`).join('\n')}
+
+Top Expense Categories:
+${(summaryData.expenseBreakdown||[]).slice(0,8).map(c=>`${c.category}: \u00a3${c.total.toFixed(0)}`).join('\n')}
+
+Structure your response as JSON with these keys:
+- highlights: array of 3 positive observations
+- warnings: array of up to 3 concerns or risks
+- recommendations: array of up to 5 specific actions the landlord should take
+- taxNotes: any relevant UK tax considerations (allowable expenses, Section 24, etc.)
+- cashflowOutlook: a 2-3 sentence summary of cashflow health
+
+Return only valid JSON, no markdown.`;
+
+    const res=await fetch(PROXY_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]
+    })});
+    const data=await res.json();
+    const text=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const match=text.match(/\{[\s\S]*\}/);
+    if(!match)throw new Error('No JSON in response');
+    const insights=JSON.parse(match[0]);
+
+    let html='';
+    if(insights.cashflowOutlook)html+=`<div class="cashflow-summary">${esc(insights.cashflowOutlook)}</div>`;
+
+    html+='<div class="insight-grid">';
+    (insights.highlights||[]).forEach(h=>{html+=`<div class="insight-card highlight"><div class="insight-icon">\u2705</div>${esc(h)}</div>`;});
+    (insights.warnings||[]).forEach(w=>{html+=`<div class="insight-card warning"><div class="insight-icon">\u26A0\uFE0F</div>${esc(w)}</div>`;});
+    html+='</div>';
+
+    if(insights.recommendations?.length){
+      html+=`<ol class="recs-list">${insights.recommendations.map(r=>`<li>${esc(r)}</li>`).join('')}</ol>`;
+    }
+    if(insights.taxNotes){
+      html+=`<div class="tax-box"><strong>UK Tax Notes:</strong> ${esc(insights.taxNotes)}</div>`;
+    }
+
+    wrap.innerHTML=html;
+  }catch(e){
+    wrap.innerHTML=`<div style="padding:20px;color:var(--red);font-size:13px">Failed to generate insights: ${esc(e.message)}</div>`;
+  }
+  btn.disabled=false;btn.textContent='Refresh Insights';
+}
+
+// -- Export CSV --
+function exportCSV(){
+  if(!summaryData)return;
+  let txs=[];
+  Object.values(summaryData.byProperty||{}).forEach(p=>txs=txs.concat(p.transactions||[]));
+  if(activeProperty!=='all')txs=txs.filter(t=>t.property===activeProperty);
+  txs.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  let csv='Date,Description,Property,Amount\n';
+  txs.forEach(t=>{csv+=`"${t.date}","${(t.description||'').replace(/"/g,'""')}","${t.property}",${t.amount}\n`;});
+
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`DSL_Financials_${activeProperty.replace(/\s/g,'_')}_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  showToast('CSV downloaded');
+}
+
+// -- Helpers --
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function showToast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),300);},3200);}
+</script>
+</body>
+</html>

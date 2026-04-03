@@ -1,6 +1,7 @@
 {
   "rewrites": [
-    { "source": "/agent", "destination": "/double-six-lets-agent.html" }
+    { "source": "/agent", "destination": "/double-six-lets-agent.html" },
+    { "source": "/financials", "destination": "/financials.html" }
   ],
   "headers": [
     {
