@@ -22,6 +22,7 @@ export default async function handler(req, res) {
     case 'move': return handleMove(req, res);
     case 'mark-read': return handleMarkRead(req, res);
     case 'send': return handleSend(req, res);
+    case 'forward': return handleForward(req, res);
     case 'save-draft': return handleSaveDraft(req, res);
     default: return res.status(400).json({ error: `Unknown action: ${action}` });
   }
@@ -126,6 +127,26 @@ async function handleSend(req, res) {
     const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
       { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload) });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || r.status); }
+    const data = await r.json();
+    return res.status(200).json({ ok: true, messageId: data.id });
+  } catch (err) { return res.status(500).json({ error: err.message }); }
+}
+
+async function handleForward(req, res) {
+  const { to, subject, body, originalBody, originalFrom, originalDate, originalSubject } = req.body;
+  if (!to || !originalBody) return res.status(400).json({ error: 'Missing to or original email body' });
+  try {
+    const token = await getAccessToken();
+    const from = process.env.GMAIL_USER || 'double6lets@gmail.com';
+    const fwdSubject = subject || `Fwd: ${originalSubject || '(no subject)'}`;
+    const fwdBody = `${body ? body + '\r\n\r\n' : ''}---------- Forwarded message ----------\r\nFrom: ${originalFrom || 'Unknown'}\r\nDate: ${originalDate || 'Unknown'}\r\nSubject: ${originalSubject || '(no subject)'}\r\n\r\n${originalBody}`;
+    let mime = `From: ${from}\r\nTo: ${to}\r\nSubject: ${fwdSubject}\r\nContent-Type: text/plain; charset=UTF-8\r\n`;
+    mime += `\r\n${fwdBody}`;
+    const encoded = Buffer.from(mime).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+      { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: encoded }) });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || r.status); }
     const data = await r.json();
     return res.status(200).json({ ok: true, messageId: data.id });

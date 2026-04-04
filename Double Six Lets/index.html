@@ -238,6 +238,45 @@
   .btn-freeagent{background:rgba(0,133,106,.08);color:#00856a;border:1px solid rgba(0,133,106,.2);}
   .btn-freeagent:hover{background:rgba(0,133,106,.14);}
 
+  /* Forward panel */
+  .detail-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+  .detail-header-left{flex:1;min-width:0;}
+  .detail-header-actions{display:flex;gap:6px;flex-shrink:0;padding-top:2px;}
+  .btn-forward{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap;}
+  .btn-forward:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light);}
+  .btn-forward svg{width:14px;height:14px;}
+  .fwd-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.25);z-index:200;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s ease;}
+  .fwd-modal{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:420px;max-width:92vw;max-height:85vh;overflow-y:auto;animation:fadeUp .2s ease;}
+  .fwd-modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid var(--border);}
+  .fwd-modal-title{font-family:'DM Serif Display',serif;font-size:16px;color:var(--text);}
+  .fwd-close{width:28px;height:28px;border:none;background:transparent;cursor:pointer;border-radius:var(--radius-xs);display:flex;align-items:center;justify-content:center;color:var(--text-dim);transition:all .12s;}
+  .fwd-close:hover{background:var(--surface2);color:var(--text);}
+  .fwd-modal-body{padding:16px 20px;}
+  .fwd-section{margin-bottom:14px;}
+  .fwd-section-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px;font-weight:600;display:flex;align-items:center;justify-content:space-between;}
+  .fwd-employee-list{display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;margin-bottom:8px;}
+  .fwd-employee-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .12s;}
+  .fwd-employee-item:hover{border-color:rgba(249,115,22,.3);background:var(--accent-light);}
+  .fwd-employee-item.selected{border-color:var(--accent);background:var(--accent-soft);}
+  .fwd-emp-avatar{width:28px;height:28px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text-muted);flex-shrink:0;}
+  .fwd-emp-info{flex:1;min-width:0;}
+  .fwd-emp-name{font-size:13px;font-weight:500;color:var(--text);}
+  .fwd-emp-email{font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fwd-emp-role{font-size:10px;color:var(--text-dim);padding:2px 6px;border-radius:4px;background:var(--surface2);flex-shrink:0;}
+  .fwd-emp-remove{width:22px;height:22px;border:none;background:transparent;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);transition:all .1s;flex-shrink:0;opacity:0;}
+  .fwd-employee-item:hover .fwd-emp-remove{opacity:1;}
+  .fwd-emp-remove:hover{background:rgba(225,29,72,.08);color:var(--legal);}
+  .fwd-add-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:6px;}
+  .fwd-add-row.three-col{grid-template-columns:1fr 1fr 1fr auto;}
+  .fwd-add-input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:6px 8px;outline:none;transition:all .2s;}
+  .fwd-add-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(249,115,22,.08);}
+  .fwd-add-btn{padding:6px 10px;border-radius:var(--radius-xs);border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;transition:all .15s;white-space:nowrap;}
+  .fwd-add-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light);}
+  .fwd-message-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 10px;resize:vertical;min-height:60px;outline:none;transition:all .2s;line-height:1.5;}
+  .fwd-message-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(249,115,22,.08);}
+  .fwd-modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--border);}
+  .fwd-empty{font-size:12px;color:var(--text-dim);text-align:center;padding:12px;}
+
   /* Dashboard charts */
   .chart-section{margin-top:8px;}
   .chart-bar-wrap{margin-bottom:6px;}
@@ -430,11 +469,21 @@
       </div>
       <div class="detail-content" id="detailContent" style="display:none">
         <div class="detail-header">
-          <div class="detail-subject" id="detailSubject"></div>
-          <div class="detail-meta">
-            <div class="detail-meta-item"><strong id="detailFrom"></strong></div>
-            <div class="detail-meta-item" id="detailDate"></div>
-            <div id="detailTags"></div>
+          <div class="detail-header-row">
+            <div class="detail-header-left">
+              <div class="detail-subject" id="detailSubject"></div>
+              <div class="detail-meta">
+                <div class="detail-meta-item"><strong id="detailFrom"></strong></div>
+                <div class="detail-meta-item" id="detailDate"></div>
+                <div id="detailTags"></div>
+              </div>
+            </div>
+            <div class="detail-header-actions">
+              <button class="btn-forward" onclick="openForwardModal()" title="Forward to employee">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M10 2l5 5-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Forward
+              </button>
+            </div>
           </div>
         </div>
         <div class="ai-panel">
@@ -1375,6 +1424,136 @@ function showToast(msg){
   t.className='toast';t.textContent=msg;
   document.body.appendChild(t);
   setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),300);},3200);
+}
+
+// -- Forward to Employee --
+function getEmployees(){return JSON.parse(localStorage.getItem('dsl_employees')||'[]');}
+function saveEmployees(list){localStorage.setItem('dsl_employees',JSON.stringify(list));}
+let fwdSelectedEmployee=null;
+
+function openForwardModal(){
+  if(!selectedEmail){showToast('Select an email first');return;}
+  fwdSelectedEmployee=null;
+  const employees=getEmployees();
+  const container=document.getElementById('modalContainer');
+  container.innerHTML=`
+    <div class="fwd-overlay" onclick="closeForwardModal()">
+      <div class="fwd-modal" onclick="event.stopPropagation()">
+        <div class="fwd-modal-header">
+          <div class="fwd-modal-title">Forward to Employee</div>
+          <button class="fwd-close" onclick="closeForwardModal()"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+        </div>
+        <div class="fwd-modal-body">
+          <div class="fwd-section">
+            <div class="fwd-section-label">
+              <span>Employee Directory</span>
+              <span style="font-size:10px;color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0">${employees.length} saved</span>
+            </div>
+            <div class="fwd-employee-list" id="fwdEmployeeList">
+              ${employees.length?employees.map((emp,i)=>`
+                <div class="fwd-employee-item" data-idx="${i}" onclick="selectFwdEmployee(${i})">
+                  <div class="fwd-emp-avatar">${(emp.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}</div>
+                  <div class="fwd-emp-info">
+                    <div class="fwd-emp-name">${escHtml(emp.name)}</div>
+                    <div class="fwd-emp-email">${escHtml(emp.email)}</div>
+                  </div>
+                  ${emp.role?`<span class="fwd-emp-role">${escHtml(emp.role)}</span>`:''}
+                  <button class="fwd-emp-remove" onclick="event.stopPropagation();removeEmployee(${i})" title="Remove"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+                </div>
+              `).join(''):`<div class="fwd-empty">No employees saved yet. Add one below.</div>`}
+            </div>
+            <div class="fwd-add-row three-col">
+              <input class="fwd-add-input" id="fwdAddName" placeholder="Name" onkeydown="if(event.key==='Enter')addEmployee()">
+              <input class="fwd-add-input" id="fwdAddEmail" placeholder="Email" onkeydown="if(event.key==='Enter')addEmployee()">
+              <input class="fwd-add-input" id="fwdAddRole" placeholder="Role (optional)" onkeydown="if(event.key==='Enter')addEmployee()">
+              <button class="fwd-add-btn" onclick="addEmployee()">+ Add</button>
+            </div>
+          </div>
+          <div class="fwd-section">
+            <div class="fwd-section-label">Message (optional)</div>
+            <textarea class="fwd-message-input" id="fwdMessage" placeholder="Add a note for the employee..."></textarea>
+          </div>
+          <div class="fwd-section" style="margin-bottom:0">
+            <div style="font-size:12px;color:var(--text-dim);background:var(--surface2);border-radius:var(--radius-xs);padding:8px 10px;">
+              <strong style="color:var(--text)">Forwarding:</strong> ${escHtml(selectedEmail.subject)}
+            </div>
+          </div>
+        </div>
+        <div class="fwd-modal-footer">
+          <button class="btn btn-ghost" onclick="closeForwardModal()">Cancel</button>
+          <button class="btn btn-primary" id="fwdSendBtn" onclick="sendForward()">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="margin-right:2px"><path d="M10 2l5 5-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Send Forward
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function closeForwardModal(){
+  document.getElementById('modalContainer').innerHTML='';
+  fwdSelectedEmployee=null;
+}
+
+function selectFwdEmployee(idx){
+  fwdSelectedEmployee=idx;
+  document.querySelectorAll('.fwd-employee-item').forEach((el,i)=>{
+    el.classList.toggle('selected',i===idx);
+  });
+}
+
+function addEmployee(){
+  const name=(document.getElementById('fwdAddName')?.value||'').trim();
+  const email=(document.getElementById('fwdAddEmail')?.value||'').trim();
+  const role=(document.getElementById('fwdAddRole')?.value||'').trim();
+  if(!name||!email){showToast('Name and email are required');return;}
+  if(!email.includes('@')){showToast('Enter a valid email');return;}
+  const employees=getEmployees();
+  employees.push({id:Date.now().toString(),name,email,phone:'',role});
+  saveEmployees(employees);
+  openForwardModal();
+  showToast(name+' added to directory');
+}
+
+function removeEmployee(idx){
+  const employees=getEmployees();
+  const name=employees[idx]?.name||'Employee';
+  employees.splice(idx,1);
+  saveEmployees(employees);
+  if(fwdSelectedEmployee===idx)fwdSelectedEmployee=null;
+  else if(fwdSelectedEmployee>idx)fwdSelectedEmployee--;
+  openForwardModal();
+  showToast(name+' removed');
+}
+
+async function sendForward(){
+  if(!selectedEmail){showToast('No email selected');return;}
+  const employees=getEmployees();
+  if(fwdSelectedEmployee===null||!employees[fwdSelectedEmployee]){
+    showToast('Select an employee first');return;
+  }
+  const emp=employees[fwdSelectedEmployee];
+  const message=(document.getElementById('fwdMessage')?.value||'').trim();
+  const btn=document.getElementById('fwdSendBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Sending...';
+  try{
+    const res=await fetch('/api/gmail-actions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      action:'forward',
+      to:emp.email,
+      subject:'Fwd: '+(selectedEmail.subject||'(no subject)'),
+      body:message,
+      originalBody:selectedEmail.body||'',
+      originalFrom:selectedEmail.from||'',
+      originalDate:selectedEmail.rawDate||selectedEmail.date||'',
+      originalSubject:selectedEmail.subject||''
+    })});
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error||'Forward failed');}
+    closeForwardModal();
+    showToast('Forwarded to '+emp.name);
+  }catch(e){
+    showToast('Error: '+e.message);
+    btn.disabled=false;btn.innerHTML='Send Forward';
+  }
 }
 </script>
 </body>
