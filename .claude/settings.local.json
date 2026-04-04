@@ -31,7 +31,8 @@
       "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);print\\(''''Income:'''',d.get\\(''''totalIncome''''\\)\\);print\\(''''Expenses:'''',d.get\\(''''totalExpenses''''\\)\\)\")",
       "Bash(gh pr:*)",
       "Bash(where gh:*)",
-      "Bash(where vercel:*)"
+      "Bash(where vercel:*)",
+      "Bash(ls \"C:/Users/north/Double Six Lets/.claude/worktrees/amazing-wescoff/Double Six Lets/\"*.html)"
     ]
   }
 }
