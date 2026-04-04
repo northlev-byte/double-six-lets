@@ -129,7 +129,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 
   <!-- KPI Cards — accountant-accurate -->
   <div class="kpi-row" id="kpiRow">
-    <div class="kpi-card" onclick="filterByKpi('income')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(16,185,129,.15)'" onmouseout="this.style.boxShadow='var(--shadow)'"><div class="kpi-label">Rental Income</div><div class="kpi-value green skeleton-kpi" id="kpiIncome"></div></div>
+    <div class="kpi-card" onclick="filterByKpi('income')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(16,185,129,.15)'" onmouseout="this.style.boxShadow='var(--shadow)'"><div class="kpi-label">Trading Income</div><div class="kpi-value green skeleton-kpi" id="kpiIncome"></div></div>
     <div class="kpi-card" onclick="filterByKpi('expenses')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(225,29,72,.15)'" onmouseout="this.style.boxShadow='var(--shadow)'"><div class="kpi-label">Allowable Expenses</div><div class="kpi-value red skeleton-kpi" id="kpiExpenses"></div></div>
     <div class="kpi-card" onclick="filterByKpi('all')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(59,130,246,.15)'" onmouseout="this.style.boxShadow='var(--shadow)'"><div class="kpi-label">Net Trading Profit</div><div class="kpi-value skeleton-kpi" id="kpiProfit"></div></div>
     <div class="kpi-card" onclick="filterByKpi('intercompany')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='var(--shadow)'"><div class="kpi-label">Intercompany (excl. P&L)</div><div class="kpi-value muted skeleton-kpi" id="kpiIntercompany"></div></div>
@@ -354,7 +354,7 @@ function renderKPIs(){
   const icOut=excluded.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
   const icNet=icIn-icOut;
 
-  document.getElementById('kpiIncome').textContent='\u00a3'+(rentalIncome||totalIncome).toLocaleString(undefined,{maximumFractionDigits:0});
+  document.getElementById('kpiIncome').textContent='\u00a3'+totalIncome.toLocaleString(undefined,{maximumFractionDigits:0});
   document.getElementById('kpiIncome').className='kpi-value green';
   document.getElementById('kpiExpenses').textContent='\u00a3'+totalExpenses.toLocaleString(undefined,{maximumFractionDigits:0});
   document.getElementById('kpiExpenses').className='kpi-value red';

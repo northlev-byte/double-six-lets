@@ -1,5 +1,5 @@
 import {
-  TENANTS, PROPERTIES, KNOWN_MORTGAGE_LENDERS, INTERCOMPANY_KEYWORDS,
+  TENANTS, LETTING_AGENTS, PROPERTIES, KNOWN_MORTGAGE_LENDERS, INTERCOMPANY_KEYWORDS,
   OWNER_KEYWORDS, OWNER_NAMES, UTILITY_PROVIDERS, BROADBAND_PROVIDERS,
   MOBILE_PHONE_KEYWORDS, PROFESSIONAL_FEE_KEYWORDS, INSURANCE_KEYWORDS,
   MAINTENANCE_KEYWORDS, MANAGEMENT_FEE_KEYWORDS, GROUND_RENT_KEYWORDS,
@@ -106,17 +106,17 @@ export function categoriseTransaction(tx) {
   // ──────────────────────────────────────────────────
 
   if (isCredit) {
-    // Check for tenant names
+    // Check for tenant names, letting agents, or property keywords
     const isTenant = has(desc, TENANTS);
-    // Check for property keywords in credit description
+    const isLettingAgent = has(desc, LETTING_AGENTS);
     const hasPropertyRef = matchProperty(tx.description) !== null;
 
-    if (isTenant || hasPropertyRef) {
+    if (isTenant || isLettingAgent || hasPropertyRef) {
       result.reportingCategory = 'Rent Income';
       result.freeagentNominal = NOMINAL_CODES.RENT_RECEIVED;
       result.incomeType = 'rental_income';
-      result.confidence = isTenant ? 'high' : 'medium';
-      result.requiresReview = !isTenant;
+      result.confidence = (isTenant || isLettingAgent) ? 'high' : 'medium';
+      result.requiresReview = false;
       return result;
     }
 

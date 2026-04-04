@@ -3,6 +3,12 @@
 
 export const TENANTS = ['ilyas'];
 
+// Letting agents / rent collection services that forward rental income
+export const LETTING_AGENTS = [
+  'address properties', 'address rents', 'hills lettings', 'hills lo49gw',
+  'acorn', 'openrent',
+];
+
 export const PROPERTIES = {
   '39 Esher Road': { keywords: ['esher', 'l6 6de', 'l66de'], type: 'active' },
   '49 Greene Way': { keywords: ['greene way', 'greene', '49 greene'], type: 'active' },
