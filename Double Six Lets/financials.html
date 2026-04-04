@@ -201,6 +201,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 const PROXY_URL='https://dsl-proxy.vercel.app/api/proxy';
 let summaryData=null,activeProperty='all',activeDateRange='taxyear',activeInvTab='invoices';
 let chartInstances={};
+
+// Categories that should be excluded from P&L
+const EXCLUDED_CATEGORIES=['Intercompany Transfer','Director Loan','Director Loan In','Director Loan Out',
+  'Director Loan \u2014 Jordan Walker','Director Loan \u2014 Keisha Walker','Dividend','Acquisition Costs'];
 let reportingCategories=[];
 
 // ── Persistent overrides (survives page reload) ──
@@ -218,13 +222,14 @@ function applyOverrides(){
   if(!Object.keys(o).length)return;
   const bp=summaryData.byProperty;
 
-  // First pass: apply category overrides
+  // First pass: apply category overrides and ALWAYS derive excludeFromPnL from category
   for(const prop of Object.keys(bp)){
     (bp[prop].transactions||[]).forEach(t=>{
       const ov=o[t.id];
       if(!ov)return;
-      if(ov.category){t.overrideCategory=ov.category;t.reportingCategory=ov.category;t.requiresReview=false;t.confidence='high';
-        if(ov.excludeFromPnL!==undefined)t.excludeFromPnL=ov.excludeFromPnL;
+      if(ov.category){
+        t.overrideCategory=ov.category;t.reportingCategory=ov.category;t.requiresReview=false;t.confidence='high';
+        t.excludeFromPnL=EXCLUDED_CATEGORIES.includes(ov.category);
       }
     });
   }
@@ -343,9 +348,16 @@ function renderKPIs(){
 // ── Charts (recalculated from live transaction data to respect overrides) ──
 function getChartData(){
   if(!summaryData)return {mt:[],eb:[],bp:{},trading:[]};
-  // Gather ALL transactions and respect current excludeFromPnL flags
+  // Gather transactions based on active property tab
   let all=[];
-  Object.values(summaryData.byProperty||{}).forEach(p=>all=all.concat(p.transactions||[]));
+  const bp=summaryData.byProperty||{};
+  if(activeProperty==='all'){
+    Object.values(bp).forEach(p=>all=all.concat(p.transactions||[]));
+  }else if(activeProperty==='Intercompany'){
+    all=(bp['Intercompany']?.transactions||[]);
+  }else{
+    all=(bp[activeProperty]?.transactions||[]);
+  }
   const trading=all.filter(t=>!t.excludeFromPnL);
 
   // Monthly totals from trading only
@@ -583,10 +595,6 @@ function findTx(txId){
   }
   return null;
 }
-
-// Categories that should be excluded from P&L
-const EXCLUDED_CATEGORIES=['Intercompany Transfer','Director Loan','Director Loan In','Director Loan Out',
-  'Director Loan \u2014 Jordan Walker','Director Loan \u2014 Keisha Walker','Dividend','Acquisition Costs'];
 
 function assignCategory(sel){
   const txId=sel.dataset.txid;
