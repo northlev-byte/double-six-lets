@@ -295,13 +295,27 @@ export { matchProperty };
 
 // List of all reporting categories (for frontend dropdown)
 export const REPORTING_CATEGORIES = [
+  // Income
   'Rent Income', 'Other Income',
+  // Excluded from P&L
   'Intercompany Transfer', 'Director Loan', 'Dividend',
   'Director Loan \u2014 Jordan Walker', 'Director Loan \u2014 Keisha Walker',
   'Director Loan In', 'Director Loan Out',
+  // Property costs
   'Mortgage Interest Payable', 'Mortgage Payment',
   'Utilities \u2014 Property', 'Utilities \u2014 Broadband', 'Employee Mobile Phone',
-  'Accountancy Fees', 'Professional Fees', 'Insurance', 'Maintenance & Repairs',
-  'Management Fees', 'Ground Rent / Service Charge', 'Furnishings',
-  'Acquisition Costs', 'General / Other',
+  'Maintenance & Repairs', 'Insurance', 'Management Fees',
+  'Ground Rent / Service Charge', 'Furnishings',
+  // Professional
+  'Accountancy Fees', 'Professional Fees',
+  // Staff & office
+  'Directors\u2019 Salary', 'Directors\u2019 NIC',
+  'Office Equipment', 'Office Costs',
+  'Staff Party / Entertaining', 'Business Entertaining', 'Trivial Benefits',
+  'Subscriptions', 'Printing & Postage', 'Web Hosting',
+  'Bank Charges',
+  // Capital
+  'Acquisition Costs',
+  // Fallback
+  'General / Other',
 ];
