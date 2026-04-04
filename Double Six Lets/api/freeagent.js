@@ -298,6 +298,21 @@ Return ONLY valid JSON: { "results": [ { "transactionId": "...", "category": "..
 
 // ── Transaction data (with smart categorisation) ─────
 
+function cleanDescription(fullDesc, shortDesc) {
+  // Prefer full_description, fall back to short description
+  let d = (fullDesc || shortDesc || '').replace(/\s+/g, ' ').trim();
+  // If description is just slashes, amounts, or junk, try the other field
+  const junkPattern = /^[\/\s£\d.,]+$/;
+  if (junkPattern.test(d) && fullDesc && shortDesc) {
+    d = (shortDesc || '').replace(/\s+/g, ' ').trim();
+  }
+  // If still junk, combine both
+  if (junkPattern.test(d)) {
+    d = `${shortDesc || ''} ${fullDesc || ''}`.replace(/\s+/g, ' ').trim();
+  }
+  return d || 'Unknown transaction';
+}
+
 function enrichTransaction(raw) {
   const amt = parseFloat(raw.amount || 0);
   const desc = `${raw.description || ''} ${raw.full_description || ''}`;
@@ -306,7 +321,7 @@ function enrichTransaction(raw) {
 
   return {
     id: raw.url, date: raw.dated_on, amount: amt,
-    description: raw.description || '', fullDescription: raw.full_description || '',
+    description: cleanDescription(raw.full_description, raw.description),
     category: raw.category || '', bankAccount: raw.bank_account || '',
     explained: Math.abs(unexplained) < 0.01,
     property: cat.propertyHint || 'Unassigned',

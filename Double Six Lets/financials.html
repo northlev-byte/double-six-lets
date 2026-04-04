@@ -102,6 +102,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 </style>
 </head>
 <body>
+<script src="/gate.js"></script>
 <header>
   <div class="brand">
     <div class="brand-mark">66</div>
@@ -215,15 +216,42 @@ function applyOverrides(){
   if(!summaryData)return;
   const o=loadOverrides();
   if(!Object.keys(o).length)return;
-  for(const prop of Object.keys(summaryData.byProperty||{})){
-    (summaryData.byProperty[prop].transactions||[]).forEach(t=>{
+  const bp=summaryData.byProperty;
+
+  // First pass: apply category overrides
+  for(const prop of Object.keys(bp)){
+    (bp[prop].transactions||[]).forEach(t=>{
       const ov=o[t.id];
       if(!ov)return;
       if(ov.category){t.overrideCategory=ov.category;t.reportingCategory=ov.category;t.requiresReview=false;t.confidence='high';}
-      if(ov.property&&ov.property!==t.property){
-        // Property reassignment is handled separately in reassignProperty
-      }
     });
+  }
+
+  // Second pass: apply property moves
+  const moves=[];
+  for(const prop of Object.keys(bp)){
+    const txs=bp[prop].transactions||[];
+    for(let i=txs.length-1;i>=0;i--){
+      const ov=o[txs[i].id];
+      if(ov?.property&&ov.property!==prop){
+        moves.push({tx:txs.splice(i,1)[0],to:ov.property});
+      }
+    }
+  }
+  moves.forEach(m=>{
+    m.tx.property=m.to;
+    if(!bp[m.to])bp[m.to]={income:0,expenses:0,profit:0,transactions:[]};
+    bp[m.to].transactions.push(m.tx);
+  });
+
+  // Recalculate totals per property
+  if(moves.length){
+    for(const p of Object.keys(bp)){
+      const trading=bp[p].transactions.filter(t=>!t.excludeFromPnL);
+      bp[p].income=trading.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+      bp[p].expenses=trading.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
+      bp[p].profit=bp[p].income-bp[p].expenses;
+    }
   }
 }
 
@@ -504,10 +532,20 @@ function reassignProperty(sel){
   }
 }
 
+// Nominal codes that are balance sheet items and can't be used as bank transaction explanations
+const BALANCE_SHEET_NOMINALS=['907','908','602','601','604','750','901','998','999'];
+
 async function syncToFreeAgent(txId){
   const tx=findTx(txId);
   if(!tx){showToast('Transaction not found');return;}
-  const nominal=tx.freeagentNominal||'298';
+  const nominal=tx.freeagentNominal||'280';
+
+  // Balance sheet items (director loans, dividends, capital assets) can't be explained via this API
+  if(BALANCE_SHEET_NOMINALS.includes(nominal)){
+    showToast('This is a balance sheet item ('+tx.reportingCategory+') \u2014 handle as a bank transfer in FreeAgent directly');
+    return;
+  }
+
   showToast('Syncing to FreeAgent...');
   try{
     const res=await fetch('/api/freeagent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
@@ -522,7 +560,7 @@ async function syncToFreeAgent(txId){
 async function bulkSyncAll(){
   if(!summaryData)return;
   let txs=[];Object.values(summaryData.byProperty||{}).forEach(p=>txs=txs.concat(p.transactions||[]));
-  const unsyncedTx=txs.filter(t=>!t.explained&&!t.synced&&t.confidence!=='low');
+  const unsyncedTx=txs.filter(t=>!t.explained&&!t.synced&&t.confidence!=='low'&&!BALANCE_SHEET_NOMINALS.includes(t.freeagentNominal||''));
   if(!unsyncedTx.length){showToast('No transactions to sync (all synced or low confidence)');return;}
   showToast(`Syncing ${unsyncedTx.length} transactions...`);
   try{
