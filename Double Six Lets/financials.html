@@ -129,10 +129,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 
   <!-- KPI Cards — accountant-accurate -->
   <div class="kpi-row" id="kpiRow">
-    <div class="kpi-card"><div class="kpi-label">Rental Income</div><div class="kpi-value green skeleton-kpi" id="kpiIncome"></div></div>
-    <div class="kpi-card"><div class="kpi-label">Allowable Expenses</div><div class="kpi-value red skeleton-kpi" id="kpiExpenses"></div></div>
-    <div class="kpi-card"><div class="kpi-label">Net Trading Profit</div><div class="kpi-value skeleton-kpi" id="kpiProfit"></div></div>
-    <div class="kpi-card"><div class="kpi-label">Intercompany (excl. P&L)</div><div class="kpi-value muted skeleton-kpi" id="kpiIntercompany"></div></div>
+    <div class="kpi-card" onclick="filterByKpi('income')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(16,185,129,.15)'" onmouseout="this.style.boxShadow='var(--shadow)'"><div class="kpi-label">Rental Income</div><div class="kpi-value green skeleton-kpi" id="kpiIncome"></div></div>
+    <div class="kpi-card" onclick="filterByKpi('expenses')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(225,29,72,.15)'" onmouseout="this.style.boxShadow='var(--shadow)'"><div class="kpi-label">Allowable Expenses</div><div class="kpi-value red skeleton-kpi" id="kpiExpenses"></div></div>
+    <div class="kpi-card" onclick="filterByKpi('all')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(59,130,246,.15)'" onmouseout="this.style.boxShadow='var(--shadow)'"><div class="kpi-label">Net Trading Profit</div><div class="kpi-value skeleton-kpi" id="kpiProfit"></div></div>
+    <div class="kpi-card" onclick="filterByKpi('intercompany')" style="cursor:pointer;transition:box-shadow .15s;" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='var(--shadow)'"><div class="kpi-label">Intercompany (excl. P&L)</div><div class="kpi-value muted skeleton-kpi" id="kpiIntercompany"></div></div>
   </div>
 
   <!-- Property Tabs — now with Intercompany -->
@@ -298,8 +298,27 @@ function setDateRange(range){
   loadAll();
 }
 
+let activeKpiFilter='all';
+function filterByKpi(type){
+  activeKpiFilter=type;
+  if(type==='intercompany'){
+    setPropertyTab('Intercompany');
+    document.querySelectorAll('#propTabs .tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('#propTabs .tab-btn:last-child')?.classList.add('active');
+  }else{
+    activeProperty='all';
+    document.querySelectorAll('#propTabs .tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelector('#propTabs .tab-btn:first-child')?.classList.add('active');
+    document.getElementById('propSummary').style.display='none';
+    renderTransactions();
+  }
+  // Scroll to transactions
+  document.getElementById('txTableWrap')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
 function setPropertyTab(prop){
   activeProperty=prop;
+  activeKpiFilter='all'; // reset KPI filter when switching property tabs
   document.querySelectorAll('#propTabs .tab-btn').forEach(b=>b.classList.remove('active'));
   event.target.classList.add('active');
   if(prop!=='all'){
@@ -536,6 +555,11 @@ function renderTransactions(){
   let txs=[];const bp=summaryData.byProperty||{};
   if(activeProperty==='all'){Object.values(bp).forEach(p=>txs=txs.concat(p.transactions||[]));}
   else{txs=bp[activeProperty]?.transactions||[];}
+
+  // Apply KPI filter
+  if(activeKpiFilter==='income')txs=txs.filter(t=>t.amount>0&&!t.excludeFromPnL);
+  else if(activeKpiFilter==='expenses')txs=txs.filter(t=>t.amount<0&&!t.excludeFromPnL);
+
   txs.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
   const reviewCount=txs.filter(t=>t.requiresReview).length;

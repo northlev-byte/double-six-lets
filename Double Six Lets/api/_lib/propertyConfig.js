@@ -116,4 +116,5 @@ export const NOMINAL_CODES = {
   WEB_HOSTING: '268',               // Web Hosting (admin_expenses)
   DIRECTORS_SALARY: '407',          // Directors' Salaries (general)
   DIRECTORS_NIC: '408',             // Directors' Employer NICs (general)
+  MEETINGS: '285',                  // Accommodation and Meals (admin — meetings/conferences)
 };

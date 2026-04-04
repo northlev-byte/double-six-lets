@@ -311,7 +311,7 @@ export const REPORTING_CATEGORIES = [
   // Staff & office
   'Directors\u2019 Salary', 'Directors\u2019 NIC',
   'Office Equipment', 'Office Costs',
-  'Staff Party / Entertaining', 'Business Entertaining', 'Trivial Benefits',
+  'Staff Party / Entertaining', 'Business Entertaining', 'Meetings & Conferences', 'Trivial Benefits',
   'Subscriptions', 'Printing & Postage', 'Web Hosting',
   'Bank Charges',
   // Capital
