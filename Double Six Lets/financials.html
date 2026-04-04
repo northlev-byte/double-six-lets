@@ -223,7 +223,9 @@ function applyOverrides(){
     (bp[prop].transactions||[]).forEach(t=>{
       const ov=o[t.id];
       if(!ov)return;
-      if(ov.category){t.overrideCategory=ov.category;t.reportingCategory=ov.category;t.requiresReview=false;t.confidence='high';}
+      if(ov.category){t.overrideCategory=ov.category;t.reportingCategory=ov.category;t.requiresReview=false;t.confidence='high';
+        if(ov.excludeFromPnL!==undefined)t.excludeFromPnL=ov.excludeFromPnL;
+      }
     });
   }
 
@@ -312,60 +314,142 @@ function setPropertyTab(prop){
   renderTransactions();renderCharts();
 }
 
-// ── KPIs ──
+// ── KPIs (recalculated from live data to respect overrides) ──
 function renderKPIs(){
   if(!summaryData)return;
-  const s=summaryData;
-  document.getElementById('kpiIncome').textContent='\u00a3'+s.rentalIncome.toFixed(0);
+  let all=[];
+  Object.values(summaryData.byProperty||{}).forEach(p=>all=all.concat(p.transactions||[]));
+  const trading=all.filter(t=>!t.excludeFromPnL);
+  const excluded=all.filter(t=>t.excludeFromPnL);
+
+  const rentalIncome=trading.filter(t=>t.amount>0&&t.incomeType==='rental_income').reduce((s,t)=>s+t.amount,0);
+  const totalIncome=trading.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+  const totalExpenses=trading.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
+  const netProfit=totalIncome-totalExpenses;
+  const icIn=excluded.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+  const icOut=excluded.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0);
+  const icNet=icIn-icOut;
+
+  document.getElementById('kpiIncome').textContent='\u00a3'+(rentalIncome||totalIncome).toLocaleString(undefined,{maximumFractionDigits:0});
   document.getElementById('kpiIncome').className='kpi-value green';
-  document.getElementById('kpiExpenses').textContent='\u00a3'+s.totalAllowableExpenses.toFixed(0);
+  document.getElementById('kpiExpenses').textContent='\u00a3'+totalExpenses.toLocaleString(undefined,{maximumFractionDigits:0});
   document.getElementById('kpiExpenses').className='kpi-value red';
-  const np=s.netProfit;
-  document.getElementById('kpiProfit').textContent=(np>=0?'\u00a3':'-\u00a3')+Math.abs(np).toFixed(0);
-  document.getElementById('kpiProfit').className='kpi-value '+(np>=0?'green':'red');
-  const icNet=s.intercompanyNet||0;
-  document.getElementById('kpiIntercompany').textContent=(icNet>=0?'+':'')+'\u00a3'+Math.abs(icNet).toFixed(0);
+  document.getElementById('kpiProfit').textContent=(netProfit>=0?'\u00a3':'-\u00a3')+Math.abs(netProfit).toLocaleString(undefined,{maximumFractionDigits:0});
+  document.getElementById('kpiProfit').className='kpi-value '+(netProfit>=0?'green':'red');
+  document.getElementById('kpiIntercompany').textContent=(icNet>=0?'+':'')+'\u00a3'+Math.abs(icNet).toLocaleString(undefined,{maximumFractionDigits:0});
   document.getElementById('kpiIntercompany').className='kpi-value muted';
 }
 
-// ── Charts ──
+// ── Charts (recalculated from live transaction data to respect overrides) ──
+function getChartData(){
+  if(!summaryData)return {mt:[],eb:[],bp:{},trading:[]};
+  // Gather ALL transactions and respect current excludeFromPnL flags
+  let all=[];
+  Object.values(summaryData.byProperty||{}).forEach(p=>all=all.concat(p.transactions||[]));
+  const trading=all.filter(t=>!t.excludeFromPnL);
+
+  // Monthly totals from trading only
+  const mm={};
+  trading.forEach(t=>{
+    const m=(t.date||'').substring(0,7);if(!m)return;
+    if(!mm[m])mm[m]={month:m,income:0,expenses:0,profit:0};
+    if(t.amount>0)mm[m].income+=t.amount;else mm[m].expenses+=Math.abs(t.amount);
+  });
+  const mt=Object.values(mm).sort((a,b)=>a.month.localeCompare(b.month));
+  mt.forEach(m=>{m.profit=m.income-m.expenses;});
+
+  // Expense breakdown from trading only
+  const cm={};
+  trading.filter(t=>t.amount<0).forEach(t=>{
+    const cat=t.overrideCategory||t.reportingCategory||'General / Other';
+    cm[cat]=(cm[cat]||0)+Math.abs(t.amount);
+  });
+  const eb=Object.entries(cm).map(([category,total])=>({category,total})).sort((a,b)=>b.total-a.total);
+
+  return {mt,eb,bp:summaryData.byProperty||{},trading};
+}
+
 function renderCharts(){
   if(!summaryData)return;
-  const mt=summaryData.monthlyTotals||[];
-  const bp=summaryData.byProperty||{};
-  const eb=summaryData.expenseBreakdown||[];
+  const {mt,eb,bp}=getChartData();
   Object.values(chartInstances).forEach(c=>c.destroy());
   chartInstances={};
-  const cc={green:'#10b981',red:'#e11d48',amber:'#d97706',blue:'#3b82f6',accent:'#f97316',purple:'#7c3aed',teal:'#0d9488'};
 
+  // Shared chart defaults
+  Chart.defaults.font.family="'DM Sans',sans-serif";
+  Chart.defaults.color='#6b7080';
+
+  const palette={
+    income:'#10b981',incomeBg:'rgba(16,185,129,.15)',
+    expense:'#e11d48',expenseBg:'rgba(225,29,72,.15)',
+    profit:'#3b82f6',profitBg:'rgba(59,130,246,.1)',
+    accent:'#f97316',accentBg:'rgba(249,115,22,.12)',
+  };
+  const catPalette=['#f97316','#e11d48','#7c3aed','#0d9488','#d97706','#3b82f6','#64748b','#10b981','#8b5cf6','#ec4899'];
+  const barOpts={borderRadius:6,borderSkipped:false,maxBarThickness:28};
+
+  // Format month labels nicely
+  const monthLabels=mt.map(m=>{const[y,mo]=m.month.split('-');const names=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return names[+mo]+' '+y.slice(2);});
+
+  // 1. Monthly Income vs Expenses
   chartInstances.monthly=new Chart(document.getElementById('chartMonthly'),{
-    type:'bar',data:{labels:mt.map(m=>m.month),datasets:[
-      {label:'Income',data:mt.map(m=>m.income),backgroundColor:cc.green+'33',borderColor:cc.green,borderWidth:1.5},
-      {label:'Expenses',data:mt.map(m=>m.expenses),backgroundColor:cc.red+'33',borderColor:cc.red,borderWidth:1.5},
-      {label:'Profit',data:mt.map(m=>m.profit),backgroundColor:cc.blue+'33',borderColor:cc.blue,borderWidth:1.5,type:'line',fill:false,tension:.3}
-    ]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>'\u00a3'+v}}}}
+    type:'bar',
+    data:{labels:monthLabels,datasets:[
+      {label:'Income',data:mt.map(m=>m.income),backgroundColor:palette.income,borderColor:palette.income,borderWidth:0,...barOpts},
+      {label:'Expenses',data:mt.map(m=>m.expenses),backgroundColor:palette.expense,borderColor:palette.expense,borderWidth:0,...barOpts},
+      {label:'Profit',data:mt.map(m=>m.profit),type:'line',borderColor:palette.profit,backgroundColor:palette.profitBg,fill:true,tension:.4,pointRadius:4,pointBackgroundColor:palette.profit,pointBorderColor:'#fff',pointBorderWidth:2,borderWidth:2.5}
+    ]},
+    options:{responsive:true,interaction:{intersect:false,mode:'index'},
+      plugins:{legend:{position:'bottom',labels:{font:{size:11,weight:'500'},usePointStyle:true,pointStyle:'circle',padding:16}},
+        tooltip:{backgroundColor:'#1a1a2e',titleFont:{size:12,weight:'600'},bodyFont:{size:12},padding:10,cornerRadius:8,
+          callbacks:{label:ctx=>` ${ctx.dataset.label}: \u00a3${ctx.parsed.y?.toLocaleString(undefined,{minimumFractionDigits:0})}`}}},
+      scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)',drawBorder:false},ticks:{callback:v=>'\u00a3'+v.toLocaleString(),font:{size:11}},border:{display:false}},
+        x:{grid:{display:false},border:{display:false},ticks:{font:{size:11}}}}}
   });
 
-  const topCats=eb.slice(0,10);
-  const catColors=['#f97316','#e11d48','#7c3aed','#0d9488','#d97706','#3b82f6','#6b7080','#10b981','#8b5cf6','#ec4899'];
+  // 2. Expense Breakdown — doughnut
+  const topCats=eb.slice(0,8);
   chartInstances.expenses=new Chart(document.getElementById('chartExpenses'),{
-    type:'doughnut',data:{labels:topCats.map(c=>c.category),datasets:[{data:topCats.map(c=>c.total),backgroundColor:catColors,borderWidth:0}]},
-    options:{responsive:true,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}
+    type:'doughnut',
+    data:{labels:topCats.map(c=>c.category),datasets:[{data:topCats.map(c=>c.total),backgroundColor:catPalette.slice(0,topCats.length),borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,cutout:'65%',
+      plugins:{legend:{position:'right',labels:{font:{size:11,weight:'500'},usePointStyle:true,pointStyle:'circle',padding:10,boxWidth:8}},
+        tooltip:{backgroundColor:'#1a1a2e',padding:10,cornerRadius:8,callbacks:{label:ctx=>`${ctx.label}: \u00a3${ctx.parsed.toLocaleString()}`}}}}
   });
 
+  // 3. Profit by Property — horizontal bar
   const propNames=Object.keys(bp).filter(p=>p!=='Unassigned'&&p!=='Intercompany');
   chartInstances.property=new Chart(document.getElementById('chartProperty'),{
-    type:'bar',data:{labels:propNames,datasets:[
-      {label:'Income',data:propNames.map(p=>bp[p]?.income||0),backgroundColor:cc.green+'55'},
-      {label:'Expenses',data:propNames.map(p=>bp[p]?.expenses||0),backgroundColor:cc.red+'55'},
-      {label:'Profit',data:propNames.map(p=>bp[p]?.profit||0),backgroundColor:cc.blue+'55'}
-    ]},options:{indexAxis:'y',responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},scales:{x:{ticks:{callback:v=>'\u00a3'+v}}}}
+    type:'bar',
+    data:{labels:propNames,datasets:[
+      {label:'Income',data:propNames.map(p=>bp[p]?.income||0),backgroundColor:'rgba(16,185,129,.75)',borderRadius:6,borderSkipped:false,maxBarThickness:18},
+      {label:'Expenses',data:propNames.map(p=>bp[p]?.expenses||0),backgroundColor:'rgba(225,29,72,.65)',borderRadius:6,borderSkipped:false,maxBarThickness:18},
+      {label:'Profit',data:propNames.map(p=>bp[p]?.profit||0),backgroundColor:'rgba(59,130,246,.6)',borderRadius:6,borderSkipped:false,maxBarThickness:18}
+    ]},
+    options:{indexAxis:'y',responsive:true,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11,weight:'500'},usePointStyle:true,pointStyle:'circle',padding:16}},
+        tooltip:{backgroundColor:'#1a1a2e',padding:10,cornerRadius:8,callbacks:{label:ctx=>` ${ctx.dataset.label}: \u00a3${ctx.parsed.x?.toLocaleString()}`}}},
+      scales:{x:{grid:{color:'rgba(0,0,0,.04)',drawBorder:false},ticks:{callback:v=>'\u00a3'+v.toLocaleString(),font:{size:11}},border:{display:false}},
+        y:{grid:{display:false},border:{display:false},ticks:{font:{size:12,weight:'500'}}}}}
   });
 
+  // 4. Cumulative Cash Flow — area chart
   let cum=0;const cumData=mt.map(m=>{cum+=m.profit;return cum;});
+  const isPositive=cumData.length&&cumData[cumData.length-1]>=0;
   chartInstances.cashflow=new Chart(document.getElementById('chartCashflow'),{
-    type:'line',data:{labels:mt.map(m=>m.month),datasets:[{label:'Cumulative Cash Flow',data:cumData,borderColor:cc.accent,backgroundColor:cc.accent+'15',fill:true,tension:.4,pointRadius:3}]},
-    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'\u00a3'+v}}}}
+    type:'line',
+    data:{labels:monthLabels,datasets:[{
+      label:'Cumulative Cash Flow',data:cumData,
+      borderColor:isPositive?palette.income:palette.accent,
+      backgroundColor:isPositive?palette.incomeBg:palette.accentBg,
+      fill:true,tension:.4,pointRadius:5,pointBackgroundColor:isPositive?palette.income:palette.accent,
+      pointBorderColor:'#fff',pointBorderWidth:2.5,borderWidth:3
+    }]},
+    options:{responsive:true,interaction:{intersect:false},
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:'#1a1a2e',padding:10,cornerRadius:8,callbacks:{label:ctx=>`Cash Flow: \u00a3${ctx.parsed.y?.toLocaleString()}`}}},
+      scales:{y:{grid:{color:'rgba(0,0,0,.04)',drawBorder:false},ticks:{callback:v=>'\u00a3'+v.toLocaleString(),font:{size:11}},border:{display:false}},
+        x:{grid:{display:false},border:{display:false},ticks:{font:{size:11}}}}}
   });
 }
 
@@ -500,11 +584,20 @@ function findTx(txId){
   return null;
 }
 
+// Categories that should be excluded from P&L
+const EXCLUDED_CATEGORIES=['Intercompany Transfer','Director Loan','Director Loan In','Director Loan Out',
+  'Director Loan \u2014 Jordan Walker','Director Loan \u2014 Keisha Walker','Dividend','Acquisition Costs'];
+
 function assignCategory(sel){
   const txId=sel.dataset.txid;
   const cat=sel.value;
   const tx=findTx(txId);
-  if(tx){tx.overrideCategory=cat;tx.reportingCategory=cat;tx.requiresReview=false;tx.confidence='high';saveOverride(txId,'category',cat);showToast('Category: '+cat);}
+  if(tx){
+    tx.overrideCategory=cat;tx.reportingCategory=cat;tx.requiresReview=false;tx.confidence='high';
+    tx.excludeFromPnL=EXCLUDED_CATEGORIES.includes(cat);
+    saveOverride(txId,'category',cat);saveOverride(txId,'excludeFromPnL',tx.excludeFromPnL);
+    showToast('Category: '+cat+(tx.excludeFromPnL?' (excluded from P&L)':''));
+  }
 }
 
 function reassignProperty(sel){
